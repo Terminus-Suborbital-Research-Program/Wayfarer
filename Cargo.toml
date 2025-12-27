@@ -1,0 +1,12 @@
+[package]
+name = "wayfarer"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+usno_gnc_catalog = { path = "../angel"}
+aether = {path = "../aether/crates/aether", features = ["serde"] }
+bincode = { version = "2.0.1", features = ["serde"] }
+serde = "1.0.228"
+
+
