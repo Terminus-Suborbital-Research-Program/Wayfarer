@@ -4,9 +4,13 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+#usno_gnc_catalog = { git = "https://git.nuntius.us/atmo/angel.git"} 
 usno_gnc_catalog = { path = "../angel"}
-aether = {path = "../aether/crates/aether", features = ["serde"] }
+#aether = {path = "../aether/crates/aether", features = ["serde"] }
+aether = {git = "https://github.com/AtmoPierce/aether.git", features = ["serde"]}
 bincode = { version = "2.0.1", features = ["serde"] }
 serde = "1.0.228"
+image = "0.25.9"
 
-
+[net]
+git-fetch-with-cli = true

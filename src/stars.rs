@@ -1,25 +1,30 @@
+use serde::{Deserialize, Serialize};
+use aether::math::Vector;
+use image::{GrayImage, ImageReader};
+use image::DynamicImage;
+
 #[derive(Serialize, Deserialize, Debug)]
-struct Star {
-    vector: Vector<f64,3>,
+pub struct Star {
+    pub vector: Vector<f64,3>,
     // k_vectors: [f64; 3],
-    mag: f32,
+    pub mag: f32,
 }
 
 impl Star {
-    fn new(vector: Vector<f64, 3>, mag: f32) -> Self {
+    pub fn new(vector: Vector<f64, 3>, mag: f32) -> Self {
         Self { vector, mag }
     }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-struct StarPair {
-    cos_theta: f64,
-    id_1: usize,
-    id_2: usize,
+pub struct StarPair {
+    pub cos_theta: f64,
+    pub id_1: usize,
+    pub id_2: usize,
 }
 
-struct CamConfig {
-    fov: f64,
+pub struct CamConfig {
+    pub fov: f64,
 }
 
 impl  Default for  CamConfig {
@@ -29,3 +34,11 @@ impl  Default for  CamConfig {
         }
     }
 }
+
+
+
+// impl TryFrom<&str> for Centroids {
+//     fn try_from(value: &str) -> Result<Self, Self::Error> {
+        
+//     }
+// }
