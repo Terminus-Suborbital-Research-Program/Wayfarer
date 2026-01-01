@@ -15,8 +15,8 @@ use aether::math::Vector;
 // Create the star pair vector (set of all stars)
 pub fn init_data() {
     let gnc = GncCatalogReader::from_csv("../angel/catalog/gnc_v1_1_mar_2_2023.csv").unwrap();
-    let mut star_cat_saver = ObjectWriter::new("stars");
-    let mut star_pair_saver= ObjectWriter::new("star_pairs");
+    let mut star_cat_saver = ObjectWriter::new("stars.dat");
+    let mut star_pair_saver= ObjectWriter::new("star_pairs.dat");
 
     let mut stars: Vec<Star> = Vec::with_capacity(4424);
     let cam_config = CamConfig::default();
@@ -78,10 +78,10 @@ pub fn init_data() {
 
 pub fn init_k_vector() {
     // init_data();
-    let mut stars_reader = ObjectReader::new("stars");
+    let mut stars_reader = ObjectReader::new("stars.dat");
     let mut stars = stars_reader.load_obj::<Vec<Star>>().unwrap();
 
-    let mut pairs_reader = ObjectReader::new("star_pairs");
+    let mut pairs_reader = ObjectReader::new("star_pairs.dat");
     let mut pairs = pairs_reader.load_obj::<Vec<StarPair>>().unwrap();
 
     println!("Stars Loaded: {}, Pairs Loaded: {}", stars.len(), pairs.len());
@@ -118,6 +118,6 @@ pub fn init_k_vector() {
         current_k += 1;
     }
 
-    let mut k_writer = ObjectWriter::new("k_vector");
+    let mut k_writer = ObjectWriter::new("k_vector.dat");
     k_writer.write_obj(&k_vector).unwrap();
 }

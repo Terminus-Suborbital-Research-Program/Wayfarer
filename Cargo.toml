@@ -11,6 +11,10 @@ aether = {git = "https://github.com/AtmoPierce/aether.git", features = ["serde"]
 bincode = { version = "2.0.1", features = ["serde"] }
 serde = "1.0.228"
 image = "0.25.9"
+opencv = {version="0.98.0", optional = true}
 
 [net]
 git-fetch-with-cli = true
+
+[features]
+opencv = ["dep:opencv"]

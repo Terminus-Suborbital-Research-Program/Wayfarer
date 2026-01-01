@@ -25,6 +25,8 @@ mod image_tools;
 use image_tools::Starfinder;
 use image::{GrayImage, ImageReader, Luma, RgbImage};
 use image::DynamicImage;
+
+use crate::image_tools::CameraModel2;
 fn main() {
     // init_data();
     // init_k_vector();
@@ -45,6 +47,13 @@ fn main() {
 
     let img = ImageReader::open(path).unwrap().decode().unwrap();
     let mut gray_image = GrayImage::from(img.clone());
-    let centroids = starfinder.star_find(&mut gray_image);
+    let mut centroids = starfinder.star_find(&mut gray_image);
+
+    let cam = CameraModel2::new();
+    cam.undistort_centroids(&mut centroids);
+
+    for centroid in centroids {
+        println!("Solution 2: X: {} Y: {}", centroid.unit_loc[0], centroid.unit_loc[1])
+    }
 }
 
