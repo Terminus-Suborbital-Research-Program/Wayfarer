@@ -43,9 +43,13 @@ impl Centroid {
 pub struct Starfinder {
     // Threshold for what pixels we simply don't want to check to see if they are a centroid, because they look like background noise
     threshold: u8,
-
     // background_noise threshold
     bg_threshold: u8,
+    // Camera model for undistorting pixels
+    camera_model: CameraModel,
+
+    // Impl cam driver / interace here in the future
+
 }
 
 impl Default for Starfinder {
@@ -53,22 +57,21 @@ impl Default for Starfinder {
         Self { 
             threshold: 20u8,
             bg_threshold: 3u8,
+            camera_model: CameraModel::default(),
         }
     }
 }
 
 impl Starfinder {
-    pub fn new(threshold: u8, bg_threshold: u8) -> Self {
+    pub fn new(threshold: u8, bg_threshold: u8, camera_model: CameraModel) -> Self {
         Self {
             threshold,
             bg_threshold,
+            camera_model,
         }
     }
 
     pub fn star_find(&self, gray_image: &mut GrayImage) -> Vec<Centroid> {
-        let mut cam = CameraModel::new().unwrap();
-
-
         let mut centroids: Vec<Centroid> = Vec::new();
         let (width, height) = gray_image.dimensions();
 
@@ -87,12 +90,6 @@ impl Starfinder {
             }
         }
         centroids.sort_by_key(|centroid| centroid.brightness);
-
-        
-        let undistorted_centroids = cam.undistort_centroids(&centroids).unwrap();
-        for c in undistorted_centroids {
-            println!("Res {}, {}",c[0], c[1]);
-        }
         centroids
 
     }
@@ -169,6 +166,10 @@ impl Starfinder {
         let centroid_y: f64 = weighted_y_sum as f64 / sum_of_brightness as f64;
 
         Centroid::new(centroid_x, centroid_y, sum_of_brightness)
+    }
+
+    fn undistort_centroids(&self, centroids: &mut [Centroid]) {
+        self.camera_model.undistort_centroids(centroids);
     }
 
 
@@ -265,6 +266,21 @@ impl CameraModel {
         let dist_coeffs = Mat::new_rows_cols_with_data(1, 5, &d_data)?.try_clone().unwrap();
 
         Ok(Self {
+            // Horizontal Scaling
+            fx: 5424.41488,
+            // Vertical Scaling
+            fy: 5424.35391,
+            // Horizontal Center
+            cx: 1295.5,
+            // Vertical Center
+            cy: 971.5,
+            // k 1..3 are coefficients that account for warping around the edges / corners (Radial Coefficients)
+            k1: 0.51059,
+            k2: -19.48679,
+            k3: 171.20994,
+            // p1 & 2 are coefficients that account for lens crookedness (tilt) relative to the sensor
+            p1: -0.00291,
+            p2: 0.0000206,
             camera_matrix,
             dist_coeffs,
         })
@@ -313,12 +329,9 @@ impl CameraModel {
     }
 }
 
-
-
-impl CameraModel {
-
-    /// Initialize with your specific Alvium + Lens parameters
-    pub fn new() -> Self {
+#[cfg(not(feature = "opencv"))]
+impl Default for CameraModel {
+    fn default() -> Self {
         Self {
             // Horizontal Scaling
             fx: 5424.41488,
@@ -336,6 +349,23 @@ impl CameraModel {
             p1: -0.00291,
             p2: 0.0000206,
         }
+    }
+}
+#[cfg(not(feature = "opencv"))]
+impl CameraModel {
+
+    pub fn new(
+        fx: f64, 
+        fy: f64, 
+        cx: f64, 
+        cy: f64, 
+        k1: f64, 
+        k2: f64, 
+        k3: f64, 
+        p1: f64, 
+        p2: f64
+    ) -> Self {
+        Self { fx, fy, cx, cy, k1, k2, k3, p1, p2 }
     }
 
     /// The "Fundamental" Operation: Pixel (x, y) -> Unit Vector (x, y, z)
@@ -381,8 +411,7 @@ impl CameraModel {
         raw_vector = raw_vector.normalize();
 
         centroid.unit_loc.data.copy_from_slice(&raw_vector.data[..2]);
-        // centroid.unit_loc[0] = raw_vector[0];
-        // centroid.unit_loc[1] = raw_vector[1];
+
     }
 
     pub fn undistort_centroids(&self, centroids: &mut [Centroid]){

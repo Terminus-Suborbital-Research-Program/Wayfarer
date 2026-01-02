@@ -3,6 +3,7 @@ use crate::stars::{
     CamConfig,
     Star,
     StarPair,
+    K_Vector,
 };
 use crate::logger::{
     ObjectWriter,
@@ -90,7 +91,8 @@ pub fn init_k_vector() {
 
     let K = 10000;
 
-    let mut k_vector = vec![0usize; K];
+    // Might change back later but k+1 now for the case that we accessed the last item in the array with the line equation.
+    let mut k_vector = vec![0usize; K + 1];
 
     let cos_min = pairs.first().unwrap().cos_theta;
     let cos_max = pairs.last().unwrap().cos_theta;
@@ -118,6 +120,8 @@ pub fn init_k_vector() {
         current_k += 1;
     }
 
+    let k_vec = K_Vector::new(k_vector, cos_min, m);
+
     let mut k_writer = ObjectWriter::new("k_vector.dat");
-    k_writer.write_obj(&k_vector).unwrap();
+    k_writer.write_obj(&k_vec).unwrap();
 }
