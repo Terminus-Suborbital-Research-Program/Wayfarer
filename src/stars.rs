@@ -17,9 +17,11 @@ pub enum StartrackerError {
     TriangleQueryFailure,
     #[error("One or more of the legs of the triangle being observed does not have a range in the k_vector table, so does not exist in the catalog")]
     NoStarsInCatalog,
+    #[error("No unique solution found for pyramid")]
+    PyramidConfirmation,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Copy, Clone)]
 pub struct Star {
     pub vector: Vector<f64,3>,
     // k_vectors: [f64; 3],
@@ -31,8 +33,7 @@ impl Star {
         Self { vector, mag }
     }
 }
-
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Copy, Clone)]
 pub struct StarPair {
     pub cos_theta: f64,
     pub id_1: usize,
@@ -63,7 +64,7 @@ struct StartrackerConfig {
 
 }
 
-struct Startracker {
+pub struct Startracker {
     k_vector: K_Vector,
     star_pairs: Vec<StarPair>,
     star_cat: Vec<Star>,
@@ -89,13 +90,19 @@ impl Default for Startracker {
 }
 
 impl Startracker {
+
+    // Retrieve the unit vec of a specific star from the starid unit vector
+    // Maybe make this by reference later, but we'll see
+    pub fn retrieve_unit_vector(&self, star_id: usize) -> Star {
+        self.star_cat[star_id].clone()
+    }
     // Iterative implementation of checking 
     pub fn query_triangle(&self, legs: &[f64;3]) -> Result<[usize;3], StartrackerError> {
         let mut counts: IndexMap<usize, usize> = IndexMap::new();
+        let mut triangle: heapless::Vec<usize, 3> = heapless::Vec::new();
         for leg in legs {
             let (bound_1, bound_2) = self.k_vector.get_pairs_range(leg);
 
-            // If a 
             if bound_1 == bound_2 {
                 return Err(StartrackerError::TriangleQueryFailure);
             }
@@ -109,7 +116,6 @@ impl Startracker {
                 *counts.entry(pair.id_2).or_insert(0) += 1;
             }
         }
-        let mut triangle:  heapless::Vec<usize,3> = heapless::Vec::new();
         for (star_id, count) in counts.iter() {
             if *count == 2 {
                 triangle.push(*star_id).map_err(|_| StartrackerError::TriangleQueryFailure)?;
@@ -121,52 +127,115 @@ impl Startracker {
         }
     }
 
-    // pub fn query_triangle_topology(&self, legs: &[f64; 3]) -> Result<[usize; 3], StartrackerError> {
-    //     // 1. Get the slice of candidate pairs for each leg
-    //     // Leg 0: Arc between Centroid 0 and 1
-    //     let (s0, e0) = self.k_vector.get_pairs_range(&legs[0]);
-    //     // Leg 1: Arc between Centroid 0 and 2
-    //     let (s1, e1) = self.k_vector.get_pairs_range(&legs[1]);
-    //     // Leg 2: Arc between Centroid 1 and 2
-    //     let (s2, e2) = self.k_vector.get_pairs_range(&legs[2]);
-
-    //     // Optimization: If any leg is empty, the triangle doesn't exist.
-    //     if s0 == e0 || s1 == e1 || s2 == e2 {
-    //         return Err(StartrackerError::TriangleQueryFailure);
-    //     }
-
-    //     let pairs_0 = &self.star_pairs[s0..e0];
-    //     let pairs_1 = &self.star_pairs[s1..e1];
-    //     let pairs_2 = &self.star_pairs[s2..e2];
-
-    //     // 2. Solve for the specific Centroids using Intersection
+    // Return starid of R
+    pub fn pyramid_confirmation(&self, legs: &[f64; 3], ids: &[usize; 3]) -> Result<usize, StartrackerError> {
         
-    //     // Centroid 0 is the pivot between Leg 0 and Leg 1
-    //     let c0 = self.find_common_star(pairs_0, pairs_1)
-    //         .ok_or(StartrackerError::TriangleQueryFailure)?;
+        let candidate_star = ids[0];
+        let (lower_bound, upper_bound) = self.k_vector.get_pairs_range(&legs[0]);
 
-    //     // Centroid 1 is the pivot between Leg 0 and Leg 2
-    //     let c1 = self.find_common_star(pairs_0, pairs_2)
-    //         .ok_or(StartrackerError::TriangleQueryFailure)?;
 
-    //     // Centroid 2 is the pivot between Leg 1 and Leg 2
-    //     let c2 = self.find_common_star(pairs_1, pairs_2)
-    //         .ok_or(StartrackerError::TriangleQueryFailure)?;
+        let initial_pairs = &self.star_pairs[lower_bound..upper_bound];
 
-    //     // 3. Validation: All 3 stars must be unique. 
-    //     // (If c0 == c1, you have a degenerate triangle/line)
-    //     if c0 == c1 || c0 == c2 || c1 == c2 {
-    //         return Err(StartrackerError::TriangleQueryFailure);
-    //     }
+        let mut r_vec: Vec<usize> = initial_pairs.iter()
+                                             .filter_map(|star_pair| {
+                                                if star_pair.id_1 == candidate_star {
+                                                    Some(star_pair.id_2)
+                                                } else if star_pair.id_2 == candidate_star {
+                                                    Some(star_pair.id_1)
+                                                } else {
+                                                    None
+                                                }
+                                             }).collect();
+                                                // .filter(|star_pair| 
+                                                //     star_pair.id_1 == candidate_star || 
+                                                //     star_pair.id_2 == candidate_star)
+                                                // .flat_map(|pair| [pair.id_1, pair.id_2])
+                                                // .collect();
 
-    //     // Returns [ID_of_Centroid_0, ID_of_Centroid_1, ID_of_Centroid_2]
-    //     Ok([c0, c1, c2])
-    // }
 
-    // Helper: Finds the single star ID that appears in both lists of pairs
+        // Check against second leg
+        let (lower_bound, upper_bound) = self.k_vector.get_pairs_range(&legs[1]);
+        let validation_pairs = &self.star_pairs[lower_bound..upper_bound];
+        let validation_id = ids[1];
+
+        r_vec
+            .retain(|candidate_id| {
+                    validation_pairs
+                            .iter()
+                            .any(|pair| {
+                                        (pair.id_1 == *candidate_id && pair.id_2 == validation_id)
+                                        || (pair.id_1 == validation_id && pair.id_2 == * candidate_id)
+                    })
+            });
+            
+        
+        // check against third leg
+        let (lower_bound, upper_bound) = self.k_vector.get_pairs_range(&legs[2]);
+        let final_validation_pairs = &self.star_pairs[lower_bound..upper_bound];
+        let final_validation_id = ids[2];
+
+
+
+        r_vec   
+             .retain(|candidate_id| {
+                    final_validation_pairs
+                            .iter()
+                            .any(|pair| {
+                                        (pair.id_1 == *candidate_id && pair.id_2 == final_validation_id)
+                                        || (pair.id_1 == final_validation_id && pair.id_2 == * candidate_id)
+                    })
+            });
+
+        if r_vec.len() == 1 {
+            Ok(r_vec[0])
+        } else {
+            Err(StartrackerError::PyramidConfirmation)
+        }  
+    }
+
+    pub fn query_triangle_topology(&self, legs: &[f64; 3]) -> Result<[usize; 3], StartrackerError> {
+        // 1. Get the slice of candidate pairs for each leg
+        // Leg 0: Arc between Centroid 0 and 1
+        let (s0, e0) = self.k_vector.get_pairs_range(&legs[0]);
+        // Leg 1: Arc between Centroid 0 and 2
+        let (s1, e1) = self.k_vector.get_pairs_range(&legs[1]);
+        // Leg 2: Arc between Centroid 1 and 2
+        let (s2, e2) = self.k_vector.get_pairs_range(&legs[2]);
+
+        // Optimization: If any leg is empty, the triangle doesn't exist.
+        if s0 == e0 || s1 == e1 || s2 == e2 {
+            return Err(StartrackerError::TriangleQueryFailure);
+        }
+
+        let pairs_0 = &self.star_pairs[s0..e0];
+        let pairs_1 = &self.star_pairs[s1..e1];
+        let pairs_2 = &self.star_pairs[s2..e2];
+
+        // Solve for the specific Centroids using Intersection
+        
+        // Centroid 0 is the pivot between Leg 0 and Leg 1
+        let c0 = self.find_common_star(pairs_0, pairs_1)
+            .ok_or(StartrackerError::TriangleQueryFailure)?;
+
+        // Centroid 1 is the pivot between Leg 0 and Leg 2
+        let c1 = self.find_common_star(pairs_0, pairs_2)
+            .ok_or(StartrackerError::TriangleQueryFailure)?;
+
+        // Centroid 2 is the pivot between Leg 1 and Leg 2
+        let c2 = self.find_common_star(pairs_1, pairs_2)
+            .ok_or(StartrackerError::TriangleQueryFailure)?;
+
+        // All 3 stars must be unique. 
+        // (If c0 == c1, you have a degenerate triangle/line)
+        if c0 == c1 || c0 == c2 || c1 == c2 {
+            return Err(StartrackerError::TriangleQueryFailure);
+        }
+
+        // Returns [ID_of_Centroid_0, ID_of_Centroid_1, ID_of_Centroid_2]
+        Ok([c0, c1, c2])
+    }
+ 
     fn find_common_star(&self, group_a: &[StarPair], group_b: &[StarPair]) -> Option<usize> {
-        // This is O(N*M). Since K-Vector bins are small (usually < 20 pairs),
-        // this nested loop is faster than allocating a Hashset.
         for pair_a in group_a {
             for pair_b in group_b {
                 // Check all 4 combinations of ID matching

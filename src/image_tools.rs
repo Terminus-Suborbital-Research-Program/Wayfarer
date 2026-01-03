@@ -168,7 +168,7 @@ impl Starfinder {
         Centroid::new(centroid_x, centroid_y, sum_of_brightness)
     }
 
-    fn undistort_centroids(&self, centroids: &mut [Centroid]) {
+    pub fn undistort_centroids(&self, centroids: &mut [Centroid]) {
         self.camera_model.undistort_centroids(centroids);
     }
 
