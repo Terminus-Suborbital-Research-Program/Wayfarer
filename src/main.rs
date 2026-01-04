@@ -66,21 +66,17 @@ fn main() {
     for dj in 1..n-1 {
         for dk in 1..n-dj {
             for i in 0..(n-dj-dk) {
-                
                 j = i + dj;
                 k = j + dk;
                 if i == j || j == k || i == k {
                     continue;
                 }
-                // println!("")
-
                 // We take the unit vectors relative to the center of the camer, of 3 centroids
                 let b1 = &centroids[i].unit_loc;
                 let b2 = &centroids[j].unit_loc;
-                let b3: &Vector<f64, 2> = &centroids[k].unit_loc;
+                let b3 = &centroids[k].unit_loc;
 
                 // We compute their "legs", cosine theta values that can be used to represent the 
-                // xx
 
                 println!("DEBUG: Unit Vec Check");
                 println!("  Uv 1 (x,y): {:?}", b1);
