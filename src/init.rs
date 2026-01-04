@@ -120,7 +120,7 @@ pub fn init_k_vector() {
         current_k += 1;
     }
 
-    let k_vec = K_Vector::new(k_vector, cos_min, m);
+    let k_vec = K_Vector::new(k_vector, cos_min, cos_max, m);
 
     let mut k_writer = ObjectWriter::new("k_vector.dat");
     k_writer.write_obj(&k_vec).unwrap();

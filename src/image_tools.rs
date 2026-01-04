@@ -412,6 +412,8 @@ impl CameraModel {
 
         centroid.unit_loc.data.copy_from_slice(&raw_vector.data[..2]);
 
+        // centroid.unit_loc.data.copy_from_slice(&raw_vector.data[..2]);
+
     }
 
     pub fn undistort_centroids(&self, centroids: &mut [Centroid]){
