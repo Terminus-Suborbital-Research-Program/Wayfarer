@@ -23,7 +23,7 @@ pub fn init_data() {
     let cam_config = CamConfig::default();
 
     let mut pairs: Vec<StarPair> = Vec::with_capacity(1_024_127);
-    let min_cos = cam_config.fov.cos();
+    let min_cos = cam_config.fov.to_radians().cos();
     let catalog = gnc.records;
     let epoch = 2025.9;
     let record_count = catalog.len();

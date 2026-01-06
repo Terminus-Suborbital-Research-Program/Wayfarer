@@ -29,8 +29,8 @@ use image::DynamicImage;
 
 use crate::image_tools::CameraModel;
 fn main() {
-    // init_data();
-    // init_k_vector();
+    init_data();
+    init_k_vector();
     // let mut stars_reader = ObjectReader::new("stars");
     // let mut stars = stars_reader.load_obj::<Vec<Star>>().expect("Failed to load star set");
 
@@ -98,7 +98,7 @@ fn main() {
                         let n_triangles = triangles.len();
                         if n_triangles == 1 {
                             let star = triangles[0][0];
-                            println!("Star Identified in itial triangle {}", star);
+                            println!("Star Identified in initial triangle {}", star);
                             break;
                         } else if n_triangles > 1 {
                             for r in 0..n {
@@ -116,7 +116,9 @@ fn main() {
                                         println!("Star Identified {}", star_r_index);
                                         break;
                                     }
-                                    Err(startracker_err) => {eprintln!("{}",startracker_err)}
+                                    Err(startracker_err) => {
+                                        // eprintln!("{}",startracker_err)
+                                    }
                                 }  
                                 }
                                 
@@ -124,7 +126,9 @@ fn main() {
                         }
                         
                     }
-                    Err(startracker_err) => {eprintln!("{}",startracker_err)}
+                    Err(startracker_err) => {
+                        // eprintln!("{}",startracker_err)
+                    }
                 }
                 
             }
