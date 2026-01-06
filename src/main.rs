@@ -78,19 +78,19 @@ fn main() {
 
                 // We compute their "legs", cosine theta values that can be used to represent the 
 
-                println!("DEBUG: Unit Vec Check");
-                println!("  Uv 1 (x,y): {:?}", b1);
-                println!("  Uv 2 (x,y): {:?}", b2);
-                println!("  Uv 3 (x,y): {:?}", b3);
+                // println!("DEBUG: Unit Vec Check");
+                // println!("  Uv 1 (x,y): {:?}", b1);
+                // println!("  Uv 2 (x,y): {:?}", b2);
+                // println!("  Uv 3 (x,y): {:?}", b3);
 
                 let c_theta_1 = b1.dot(b2);
                 let c_theta_2 = b1.dot(b3);
                 let c_theta_3 = b2.dot(b3);
 
-                println!("DEBUG: First Triangle Check");
-                println!("  Leg 1 (Cos): {:.6}", c_theta_1);
-                println!("  Leg 2 (Cos): {:.6}", c_theta_2);
-                println!("  Leg 3 (Cos): {:.6}", c_theta_3);
+                // println!("DEBUG: First Triangle Check");
+                // println!("  Leg 1 (Cos): {:.6}", c_theta_1);
+                // println!("  Leg 2 (Cos): {:.6}", c_theta_2);
+                // println!("  Leg 3 (Cos): {:.6}", c_theta_3);
 
                 match startracker.query_triangle_topology(&[c_theta_1, c_theta_2, c_theta_3]) {
                     Ok(triangles) => {
@@ -98,6 +98,7 @@ fn main() {
                         let n_triangles = triangles.len();
                         if n_triangles == 1 {
                             let star = triangles[0][0];
+                            println!("Star Identified in itial triangle {}", star);
                             break;
                         } else if n_triangles > 1 {
                             for r in 0..n {

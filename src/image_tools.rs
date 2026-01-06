@@ -22,7 +22,7 @@ use opencv::{
 
 
 pub struct Centroid {
-    pub unit_loc: Vector<f64, 2>,
+    pub unit_loc: Vector<f64, 3>,
     pub brightness: u64,
 }
 
@@ -32,7 +32,7 @@ impl Centroid {
             // X and Y can be used for image centroiding to verify we identify stars
             // Z component 1 is so these coordinates can be converted into
             // a normalized unit vector ; key step for pyramid 
-            unit_loc: Vector::new([x,y]),
+            unit_loc: Vector::new([x,y, 1.0]),
             brightness,
         }
     }
@@ -410,10 +410,7 @@ impl CameraModel {
         
         raw_vector = raw_vector.normalize();
 
-        centroid.unit_loc.data.copy_from_slice(&raw_vector.data[..2]);
-
-        // centroid.unit_loc.data.copy_from_slice(&raw_vector.data[..2]);
-
+        centroid.unit_loc.data = raw_vector.data;
     }
 
     pub fn undistort_centroids(&self, centroids: &mut [Centroid]){

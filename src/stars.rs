@@ -19,6 +19,8 @@ pub enum StartrackerError {
     NoStarsInCatalog,
     #[error("No unique solution found for pyramid")]
     PyramidConfirmation,
+    // #[error("No unique solution found for pyramid")]
+    // GetPairsError
 }
 
 #[derive(Serialize, Deserialize, Debug, Copy, Clone)]
@@ -58,39 +60,44 @@ pub struct K_Vector {
     cos_min: f64,
     cos_max: f64,
     m: f64,
+    epsilon: f64,
 }
 
 
 impl K_Vector {
-    pub fn new(k_vector_table: Vec<usize>, cos_min: f64,cos_max: f64, m: f64) -> Self {
+    pub fn new(k_vector_table: Vec<usize>, cos_min: f64,cos_max: f64, m: f64, epsilon: f64) -> Self {
         Self {
             k_vector_table,
             cos_min,
             cos_max,
             m,
+            epsilon,
         }
     }
 
     // Based on 3 cos(theta) from a triangle of stars, compute the index into the table
     // Storing the ranges of star pairs we want to look at - pre_computed
     pub fn get_pairs_range(&self, leg: &f64) -> (usize,usize) {
+
+        let start_cos = leg - self.epsilon;
+        let end_cos = leg + self.epsilon;
         // Don't calculate index to access table if the index would be out of bounds
-        if *leg < self.cos_min || *leg > (self.cos_max + 0.00001) { 
+        if start_cos < self.cos_min || end_cos > (self.cos_max + 0.00001) { 
             println!("Edge case 1: Cos min: {}, Cos max: {}, Leg: {}",self.cos_min, self.cos_max, leg);
             return (0, 0);
         }
 
-        let k_index = ((leg - self.cos_min) * self.m).floor() as usize;
+        let k_index_start = ((start_cos - self.cos_min) * self.m).floor() as usize;
+        let k_index_end = ((end_cos - self.cos_min) * self.m).floor() as usize;
+
 
         // Double verify we don't access index out of bounds
-        if k_index >= self.k_vector_table.len() - 1 {
-            println!("Edge case 2");
-
+        if k_index_end >= self.k_vector_table.len() - 1 {
             return (0, 0); 
         }
         
-        let bound_1 = self.k_vector_table[k_index];
-        let bound_2 = self.k_vector_table[k_index + 1];
+        let bound_1 = self.k_vector_table[k_index_start];
+        let bound_2 = self.k_vector_table[k_index_end + 1];
         (bound_1, bound_2)
     }
 }
