@@ -31,14 +31,6 @@ use crate::image_tools::{CameraModel, Centroid};
 fn main() {
     // init_data();
     // init_k_vector();
-    // let mut stars_reader = ObjectReader::new("stars");
-    // let mut stars = stars_reader.load_obj::<Vec<Star>>().expect("Failed to load star set");
-
-    // let mut pairs_reader = ObjectReader::new("star_pairs");
-    // let mut pairs = pairs_reader.load_obj::<Vec<StarPair>>().expect("Failed to load pairs vec");
-
-    // let mut k_reader = ObjectReader::new("k_vector");
-    // let k_vec: Vec<usize> = k_reader.load_obj::<Vec<usize>>().expect("Failed to load k vector table");
 
     let path = "/home/supergoodname77/Desktop/Elara/startracking/images/set1/bright-VISNIR-310ms_24d1g_50ict_0bl_0d80gam_set1_1.tiff";
     let gray_path = "/home/supergoodname77/Desktop/Elara/startracking/images/set1/output_gray.png";
@@ -144,9 +136,5 @@ fn main() {
             }
         }
     }
-
-    // for centroid in centroids {
-    //     println!("Solution 2: X: {} Y: {}", centroid.unit_loc[0], centroid.unit_loc[1])
-    // }
 }
 

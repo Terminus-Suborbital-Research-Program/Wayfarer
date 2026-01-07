@@ -20,8 +20,6 @@ pub enum StartrackerError {
     PyramidConfirmation,
     #[error("Calculated leg falls outside of fov range / valid bounds")]
     NoPairsRange
-    // #[error("No unique solution found for pyramid")]
-    // GetPairsError
 }
 
 #[derive(Serialize, Deserialize, Debug, Copy, Clone)]
@@ -42,7 +40,18 @@ pub struct StarPair {
     pub id_1: usize,
     pub id_2: usize,
 }
-
+impl StarPair {
+    /// Returns the ID of the star paired with `target`, or None if not found.
+    pub fn partner_of(&self, target: usize) -> Option<usize> {
+        if self.id_1 == target {
+            Some(self.id_2)
+        } else if self.id_2 == target {
+            Some(self.id_1)
+        } else {
+            None
+        }
+    }
+}
 pub struct CamConfig {
     pub fov: f64,
 }
@@ -128,7 +137,7 @@ impl Default for Startracker {
 
         for (id, star) in  star_cat.iter().enumerate() {
             if !validate_star_vec(&star.vector, "LOAD", id) {
-                panic!("Stopping initialization due to bad vector math.");
+                panic!("Stopping initialization due to bad serialization load.");
             }
         }
         
@@ -280,80 +289,55 @@ impl Startracker {
     }
 
     // Returns a list of ALL candidate triangles [ID_C0, ID_C1, ID_C2]
+    // Basically, trying to find star ids that are shared between star pairs,
+    // and build valid triangles (ones where each vertex is a member of two edges, shared by neighbor stars)
     pub fn query_triangle_topology(&self, legs: &[f64; 3]) -> Result<Vec<[usize; 3]>, StartrackerError> {
-        
-        // starts and ends for each leg
+        // Get ranges
         let (s0, e0) = self.k_vector.get_pairs_range(&legs[0])?;
         let (s1, e1) = self.k_vector.get_pairs_range(&legs[1])?;
         let (s2, e2) = self.k_vector.get_pairs_range(&legs[2])?;
 
-        // The stars and ends should be different or we cannot check ranges of star pairs
         if s0 == e0 || s1 == e1 || s2 == e2 {
-            return Err(StartrackerError::TriangleQueryFailure(String::from("No pairs length - leg does not exist in star pairs")));
+            return Err(StartrackerError::TriangleQueryFailure(String::from("Leg does not exist in catalog")));
         }
-        
 
-        // Form full triangle
-        let pairs_leg0 = &self.star_pairs[s0..e0]; // Leg for first and second centroid
-        let pairs_leg1 = &self.star_pairs[s1..e1]; // Leg for first and third centroid
-        let pairs_leg2 = &self.star_pairs[s2..e2]; // Leg for second and third centroid
+        // Get legs
+        let pairs_leg0 = &self.star_pairs[s0..e0];
+        let pairs_leg1 = &self.star_pairs[s1..e1];
+        let pairs_leg2 = &self.star_pairs[s2..e2];
 
         let mut valid_candidates = Vec::new();
 
-        // Iterate through Leg 0 to find the "Base" of the triangle
-        for pair_0 in pairs_leg0 {
-            // We have two possible orientations for this pair:
-            // Case A: C0 = pair_0.id_1, C1 = pair_0.id_2
-            // Case B: C0 = pair_0.id_2, C1 = pair_0.id_1
+        // Iterate over the pairs of leg0
+        for base_pair in pairs_leg0 {
             
-            // Case A
-            let c0 = pair_0.id_1;
-            let c1 = pair_0.id_2;
-            
-            // Find candidates for C2. 
-            // C2 must be a partner of C0 in Leg 1 list.
-            let c2_candidates = self.find_partners_in_list(pairs_leg1, c0);
-            
-            for c2 in c2_candidates {
-                // Verify C2 is also connected to C1 via Leg 2
-                if self.list_contains_pair(pairs_leg2, c1, c2) {
-                    valid_candidates.push([c0, c1, c2]);
-                }
-            }
+            // Check for both orientations (A->B and B->A) 
+            for (c0, c1) in [(base_pair.id_1, base_pair.id_2), (base_pair.id_2, base_pair.id_1)] {
+                
+                // Find c2 candidates connected to c0 in Leg 1
+                for pair1 in pairs_leg1 {
+                    let c2 = match pair1.partner_of(c0) {
+                        Some(id) => id,
+                        None => continue, // Not connected to c0
+                    };
 
-            // --- CHECK CASE B ---
-            let c0 = pair_0.id_2; // Swap
-            let c1 = pair_0.id_1; // Swap
-            
-            let c2_candidates = self.find_partners_in_list(pairs_leg1, c0);
-            for c2 in c2_candidates {
-                if self.list_contains_pair(pairs_leg2, c1, c2) {
-                    valid_candidates.push([c0, c1, c2]);
+                    // Verify the triangle is closed: Check if c2 connects to c1 in Leg 2
+                    if self.list_contains_pair(pairs_leg2, c1, c2) {
+                        valid_candidates.push([c0, c1, c2]);
+                    }
                 }
             }
         }
 
         if valid_candidates.is_empty() {
-            Err(StartrackerError::TriangleQueryFailure(String::from("No valid triangle candidates sharing pair intersections")))
+            Err(StartrackerError::TriangleQueryFailure(String::from("No valid triangles found")))
         } else {
             Ok(valid_candidates)
         }
     }
 
-    // Helper: Find all stars paired with 'target' in a specific list of pairs
-    fn find_partners_in_list(&self, pairs: &[StarPair], target: usize) -> Vec<usize> {
-        let mut partners = Vec::new();
-        for p in pairs {
-            if p.id_1 == target { partners.push(p.id_2); }
-            else if p.id_2 == target { partners.push(p.id_1); }
-        }
-        partners
-    }
-
-    // Helper: Check if a specific pair exists in a list
+    // Check to see if a specific pair exists in a list
     fn list_contains_pair(&self, pairs: &[StarPair], a: usize, b: usize) -> bool {
-        pairs.iter().any(|p| 
-            (p.id_1 == a && p.id_2 == b) || (p.id_1 == b && p.id_2 == a)
-        )
+        pairs.iter().any(|p| (p.id_1 == a && p.id_2 == b) || (p.id_1 == b && p.id_2 == a))
     }
 }

@@ -373,12 +373,12 @@ impl CameraModel {
     pub fn undistort_centroid(&self, centroid: &mut Centroid) {
         let x = centroid.unit_loc[0];
         let y = centroid.unit_loc[1];
-        // 1. Normalize pixels to "Camera Coordinates" (centered, scale-invariant)
+        // Normalize pixels to "Camera Coordinates" (centered, scale-invariant)
         // These are effectively "Distorted Slopes"
         let y_distorted = (y - self.cy) / self.fy;
         let x_distorted = (x - self.cx) / self.fx;
 
-        // 2. Iteratively Undistort (Fixed-Point Iteration)
+        // Iteratively Undistort (Fixed-Point Iteration)
         // We want to find the true (ideal) x and y such that applying distortion
         // yields x_distorted and y_distorted.
         let mut x_ideal = x_distorted;
@@ -404,7 +404,7 @@ impl CameraModel {
             y_ideal = (y_distorted - delta_y) / k_radial;
         }
 
-        // 3. Convert to Unit Vector
+        // Convert to Unit Vector
         // We now have the ideal slope (X/Z, Y/Z). We assume Z=1 to make a vector.
         let mut raw_vector = Vector::new([x_ideal, y_ideal, 1.0]);
         
@@ -419,20 +419,4 @@ impl CameraModel {
         }
     }
 
-    // Project a catalog vector to a pixel
-    pub fn project_vector_to_pixel(&self, vec: &Vector<f64, 3>) -> (f64, f64) {
-        // 1. Project 3D -> 2D (Pinhole)
-        let x_ideal = vec[0] / vec[2];
-        let y_ideal = vec[1] / vec[2];
-
-        // 2. Apply Distortion (Optional for "Rough" check, critical for precision)
-        // For a quick check, we can skip Brown-Conrady re-distortion if K1/K2 are small.
-        // Just applying intrinsics is usually enough to see if you are "close".
-        
-        // 3. Scale to Pixels
-        let u = self.fx * x_ideal + self.cx;
-        let v = self.fy * y_ideal + self.cy;
-        
-        (u, v)
-    }
 }
