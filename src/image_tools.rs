@@ -1,12 +1,6 @@
 use image::{GrayImage, ImageReader, Luma, RgbImage, Rgb};
 use image::DynamicImage;
 use aether::math::Vector;
-#[cfg(feature = "opencv")]
-use opencv::{
-    core::{Mat, MatTraitConst, Point2d, Vector as CV_Vector, CV_64F},
-    calib3d,
-    prelude::*,
-};
 
 #[derive(Debug, Copy, Clone)]
 pub struct Centroid {
@@ -217,107 +211,8 @@ pub struct CameraModel {
     pub cy: f64,
     // Distortion (Brown-Conrady)
     pub k1: f64, pub k2: f64, pub p1: f64, pub p2: f64, pub k3: f64,
-
-    // For changing out undistortion method to use opencv later on if Rust native doesn't work
-    #[cfg(feature = "opencv")]
-    camera_matrix: Mat,
-    #[cfg(feature = "opencv")]
-    dist_coeffs: Mat,
-}
-#[cfg(feature = "opencv")]
-impl CameraModel {
-    /// (Alvium 1800 U-501m + 12mm Lens)
-    pub fn new() -> opencv::Result<Self> {
-        // 1. Setup Camera Matrix (3x3)
-        // [ fx,  0, cx ]
-        // [  0, fy, cy ]
-        // [  0,  0,  1 ]
-        let k_data: Vec<f64> = vec![
-            5424.41488, 0.0,        1295.5,
-            0.0,        5424.35391, 971.5,
-            0.0,        0.0,        1.0,
-        ];
-
-        let camera_matrix = Mat::new_rows_cols_with_data(3, 3, &k_data)?.try_clone().unwrap();
-
-        // 2. Setup Distortion Coefficients (1x5)
-        // [k1, k2, p1, p2, k3]
-        let d_data: Vec<f64> = vec![
-            0.51059,    // k1
-            -19.48679,  // k2
-            -0.00291,   // p1 (tangential)
-            0.0000206,  // p2 (tangential)
-            171.20994,  // k3
-        ];
-        // Note: openCV usually expects rows=1, cols=5 for dist coeffs
-        //&d_data, 
-        let dist_coeffs = Mat::new_rows_cols_with_data(1, 5, &d_data)?.try_clone().unwrap();
-
-        Ok(Self {
-            // Horizontal Scaling
-            fx: 5424.41488,
-            // Vertical Scaling
-            fy: 5424.35391,
-            // Horizontal Center
-            cx: 1295.5,
-            // Vertical Center
-            cy: 971.5,
-            // k 1..3 are coefficients that account for warping around the edges / corners (Radial Coefficients)
-            k1: 0.51059,
-            k2: -19.48679,
-            k3: 171.20994,
-            // p1 & 2 are coefficients that account for lens crookedness (tilt) relative to the sensor
-            p1: -0.00291,
-            p2: 0.0000206,
-            camera_matrix,
-            dist_coeffs,
-        })
-    }
-
-    /// Takes raw centroids (pixels) and returns normalized Unit Vectors (Camera Frame)
-    pub fn undistort_centroids(&self, centroids: &[Centroid]) -> opencv::Result<Vec<Vector<f64, 3>>> {
-        if centroids.is_empty() {
-            return Ok(Vec::new());
-        }
-
-        // A. Convert input to OpenCV Vector<Point2d>
-        let mut src_points = CV_Vector::<Point2d>::new();
-        for c in centroids {
-            src_points.push(Point2d::new(c.unit_loc[0], c.unit_loc[1]));
-        }
-
-        // B. Prepare Output Buffer
-        let mut dst_points = CV_Vector::<Point2d>::new();
-
-        // C. The Magic Call: undistort_points
-        // We pass no_array() for R (Rectification) and P (New Camera Matrix).
-        // EFFECT: The output points will be in "Normalized Image Coordinates" 
-        // (i.e., x' = x/z, y' = y/z) centered at (0,0) with focal length 1.
-        calib3d::undistort_points(
-            &src_points, 
-            &mut dst_points, 
-            &self.camera_matrix, 
-            &self.dist_coeffs, 
-            &opencv::core::no_array(), // R (Identity)
-            &opencv::core::no_array(), // P (Identity -> Normalized coords)
-        )?;
-
-        // D. Convert Normalized Points (2D) -> Unit Vectors (3D)
-        let mut unit_vectors = Vec::with_capacity(dst_points.len());
-        
-        for point in dst_points {
-            // Construct vector [x', y', 1]
-            let vec = Vector::new([point.x, point.y, 1.0]);
-            
-            // Normalize to sphere
-            unit_vectors.push(vec.normalize());
-        }
-
-        Ok(unit_vectors)
-    }
 }
 
-#[cfg(not(feature = "opencv"))]
 impl Default for CameraModel {
     fn default() -> Self {
         Self {
