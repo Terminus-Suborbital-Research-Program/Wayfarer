@@ -6,11 +6,18 @@ edition = "2024"
 [dependencies]
 #usno_gnc_catalog = { git = "https://git.nuntius.us/atmo/angel.git"} 
 usno_gnc_catalog = { path = "../angel"}
-#aether = {path = "../aether/crates/aether", features = ["serde"] }
-aether = {git = "https://github.com/AtmoPierce/aether.git", features = ["serde"]}
+aether = {path = "../aether/crates/aether", features = ["serde"] }
+#aether = {git = "https://github.com/AtmoPierce/aether.git", features = ["serde"]}
 bincode = { version = "2.0.1", features = ["serde"] }
 serde = "1.0.228"
 image = "0.25.9"
+opencv = {version="0.98.0", optional = true}
+thiserror = "2.0.17"
+heapless = "0.9.2"
+indexmap = "2.12.1"
 
 [net]
 git-fetch-with-cli = true
+
+[features]
+opencv = ["dep:opencv"]

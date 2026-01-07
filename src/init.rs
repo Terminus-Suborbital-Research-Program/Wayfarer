@@ -3,6 +3,7 @@ use crate::stars::{
     CamConfig,
     Star,
     StarPair,
+    K_Vector,
 };
 use crate::logger::{
     ObjectWriter,
@@ -15,14 +16,14 @@ use aether::math::Vector;
 // Create the star pair vector (set of all stars)
 pub fn init_data() {
     let gnc = GncCatalogReader::from_csv("../angel/catalog/gnc_v1_1_mar_2_2023.csv").unwrap();
-    let mut star_cat_saver = ObjectWriter::new("stars");
-    let mut star_pair_saver= ObjectWriter::new("star_pairs");
+    let mut star_cat_saver = ObjectWriter::new("stars.dat");
+    let mut star_pair_saver= ObjectWriter::new("star_pairs.dat");
 
     let mut stars: Vec<Star> = Vec::with_capacity(4424);
     let cam_config = CamConfig::default();
 
     let mut pairs: Vec<StarPair> = Vec::with_capacity(1_024_127);
-    let min_cos = cam_config.fov.cos();
+    let min_cos = cam_config.fov.to_radians().cos();
     let catalog = gnc.records;
     let epoch = 2025.9;
     let record_count = catalog.len();
@@ -37,7 +38,9 @@ pub fn init_data() {
         let star =  record.icrs_sample(epoch);
 
         let mut star_vec = Vector::new(star.icrs_position_au);
+
         star_vec = star_vec.normalize();
+
         // star_vec.dot(rhs)
         stars.push(Star::new(star_vec, brightness));  
         valid_stars_count += 1;
@@ -78,10 +81,10 @@ pub fn init_data() {
 
 pub fn init_k_vector() {
     // init_data();
-    let mut stars_reader = ObjectReader::new("stars");
+    let mut stars_reader = ObjectReader::new("stars.dat");
     let mut stars = stars_reader.load_obj::<Vec<Star>>().unwrap();
 
-    let mut pairs_reader = ObjectReader::new("star_pairs");
+    let mut pairs_reader = ObjectReader::new("star_pairs.dat");
     let mut pairs = pairs_reader.load_obj::<Vec<StarPair>>().unwrap();
 
     println!("Stars Loaded: {}, Pairs Loaded: {}", stars.len(), pairs.len());
@@ -90,7 +93,8 @@ pub fn init_k_vector() {
 
     let K = 10000;
 
-    let mut k_vector = vec![0usize; K];
+    // Might change back later but k+1 now for the case that we accessed the last item in the array with the line equation.
+    let mut k_vector = vec![0usize; K + 1];
 
     let cos_min = pairs.first().unwrap().cos_theta;
     let cos_max = pairs.last().unwrap().cos_theta;
@@ -118,6 +122,8 @@ pub fn init_k_vector() {
         current_k += 1;
     }
 
-    let mut k_writer = ObjectWriter::new("k_vector");
-    k_writer.write_obj(&k_vector).unwrap();
+    let k_vec = K_Vector::new(k_vector, cos_min, cos_max, m, 0.0002);
+
+    let mut k_writer = ObjectWriter::new("k_vector.dat");
+    k_writer.write_obj(&k_vec).unwrap();
 }
