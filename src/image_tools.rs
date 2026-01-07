@@ -7,18 +7,6 @@ use opencv::{
     calib3d,
     prelude::*,
 };
-// Newtype for centroids vec
-// pub struct Centroids(pub Vec<Centroid>);
-
-// use std::ops::Deref;
-
-// impl Deref for Centroids {
-//     type Target = Vec<Centroid>;
-
-//     fn deref(&self) -> &Self::Target {
-//         &self.0
-//     }
-// }
 
 #[derive(Debug, Copy, Clone)]
 pub struct Centroid {
