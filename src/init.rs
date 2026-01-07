@@ -38,7 +38,9 @@ pub fn init_data() {
         let star =  record.icrs_sample(epoch);
 
         let mut star_vec = Vector::new(star.icrs_position_au);
+
         star_vec = star_vec.normalize();
+
         // star_vec.dot(rhs)
         stars.push(Star::new(star_vec, brightness));  
         valid_stars_count += 1;

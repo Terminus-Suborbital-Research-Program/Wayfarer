@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use aether::terrestrial::wgs84::constants::c;
 use serde::{Deserialize, Serialize};
 use aether::math::Vector;
 use image::{GrayImage, ImageReader};
@@ -19,6 +18,8 @@ pub enum StartrackerError {
     NoStarsInCatalog,
     #[error("No unique solution found for pyramid")]
     PyramidConfirmation,
+    #[error("Calculated leg falls outside of fov range / valid bounds")]
+    NoPairsRange
     // #[error("No unique solution found for pyramid")]
     // GetPairsError
 }
@@ -26,9 +27,9 @@ pub enum StartrackerError {
 #[derive(Serialize, Deserialize, Debug, Copy, Clone)]
 pub struct Star {
     pub vector: Vector<f64,3>,
-    // k_vectors: [f64; 3],
     pub mag: f32,
 }
+// k_vectors: [f64; 3],
 
 impl Star {
     pub fn new(vector: Vector<f64, 3>, mag: f32) -> Self {
@@ -77,14 +78,14 @@ impl K_Vector {
 
     // Based on 3 cos(theta) from a triangle of stars, compute the index into the table
     // Storing the ranges of star pairs we want to look at - pre_computed
-    pub fn get_pairs_range(&self, leg: &f64) -> (usize,usize) {
+    pub fn get_pairs_range(&self, leg: &f64) -> Result<(usize,usize), StartrackerError> {
 
         let start_cos = leg - self.epsilon;
         let end_cos = leg + self.epsilon;
         // Don't calculate index to access table if the index would be out of bounds
         if start_cos < self.cos_min || end_cos > (self.cos_max + 0.00001) { 
-            println!("Edge case 1: Cos min: {}, Cos max: {}, Leg: {}",self.cos_min, self.cos_max, leg);
-            return (0, 0);
+            // println!("Pairs range edge case: Cos min: {}, Cos max: {}, Leg: {}",self.cos_min, self.cos_max, leg);
+            return Err(StartrackerError::NoPairsRange)
         }
 
         let k_index_start = ((start_cos - self.cos_min) * self.m).floor() as usize;
@@ -93,12 +94,12 @@ impl K_Vector {
 
         // Double verify we don't access index out of bounds
         if k_index_end >= self.k_vector_table.len() - 1 {
-            return (0, 0); 
+            return Err(StartrackerError::NoPairsRange)
         }
         
         let bound_1 = self.k_vector_table[k_index_start];
         let bound_2 = self.k_vector_table[k_index_end + 1];
-        (bound_1, bound_2)
+        Ok((bound_1, bound_2))
     }
 }
 
@@ -124,6 +125,13 @@ impl Default for Startracker {
 
         let mut k_reader = ObjectReader::new("k_vector.dat");
         let k_vector: K_Vector = k_reader.load_obj::<K_Vector>().expect("Failed to load k vector table");
+
+        for (id, star) in  star_cat.iter().enumerate() {
+            if !validate_star_vec(&star.vector, "LOAD", id) {
+                panic!("Stopping initialization due to bad vector math.");
+            }
+        }
+        
         
         Self {
             k_vector,
@@ -131,6 +139,32 @@ impl Default for Startracker {
             star_cat,
         }
     }
+}
+
+
+// Function to validate that star unit vectors are normalized - used for troubleshooting star
+// vec serialization error. REMOVE when vector serialization correction is added to main aether repo
+pub fn validate_star_vec(vec: &Vector<f64, 3>, context: &str, id: usize) -> bool {
+    // Check for NaNs or Infinite values
+    if !vec[0].is_finite() || !vec[1].is_finite() || !vec[2].is_finite() {
+        eprintln!("Error: [{}] Star {}: Vector contains NaN or Inf: {:?}", context, id, vec);
+        return false;
+    }
+
+    // Unit vectors must be <= 1.0, with minor leniency
+    if vec[0].abs() > 1.001 || vec[1].abs() > 1.001 || vec[2].abs() > 1.001 {
+        eprintln!("Error:  [{}] Star {}: Components exceed 1.0 (Not normalized?): {:?}", context, id, vec);
+        return false;
+    }
+
+    // Magnitude should be about 1
+    let mag_sq = vec[0]*vec[0] + vec[1]*vec[1] + vec[2]*vec[2];
+    if (mag_sq - 1.0).abs() > 0.01 {
+        eprintln!("Error:  [{}] Star {}: Vector is not normalized. Length^2: {}", context, id, mag_sq);
+        return false;
+    }
+
+    true
 }
 
 impl Startracker {
@@ -171,15 +205,22 @@ impl Startracker {
     //     }
     // }
 
-    // Return starid of R
+    /// 
+    
+    // This is the "Pyramid" part of the algorthm
+    // We have a triangle. This means 3 star ids, and three legs (angular distances)
+    // We want to find a fourth reference star that exists, that we can validate has an exisitng
+    // pair from the catalog with each of the 3 triangle stars. If this is true
+    // then statistically these are definitely real stars
     pub fn pyramid_confirmation(&self, legs: &[f64; 3], ids: &[usize; 3]) -> Result<usize, StartrackerError> {
-        
+        // Get first star, and a leg corresponding to it
         let candidate_star = ids[0];
-        let (lower_bound, upper_bound) = self.k_vector.get_pairs_range(&legs[0]);
-
-
+        let (lower_bound, upper_bound) = self.k_vector.get_pairs_range(&legs[0])?;
         let initial_pairs = &self.star_pairs[lower_bound..upper_bound];
 
+        // Generate pairs for the first leg, convert to star ids of stars in the pairs,
+        // and filter to find all stars that are the other member of a pair with the 
+        // candidte star
         let mut r_vec: Vec<usize> = initial_pairs.iter()
                                              .filter_map(|star_pair| {
                                                 if star_pair.id_1 == candidate_star {
@@ -190,18 +231,17 @@ impl Startracker {
                                                     None
                                                 }
                                              }).collect();
-                                                // .filter(|star_pair| 
-                                                //     star_pair.id_1 == candidate_star || 
-                                                //     star_pair.id_2 == candidate_star)
-                                                // .flat_map(|pair| [pair.id_1, pair.id_2])
-                                                // .collect();
 
 
-        // Check against second leg
-        let (lower_bound, upper_bound) = self.k_vector.get_pairs_range(&legs[1]);
+        // Generate a second set of pairs for the second leg
+        let (lower_bound, upper_bound) = self.k_vector.get_pairs_range(&legs[1])?;
         let validation_pairs = &self.star_pairs[lower_bound..upper_bound];
         let validation_id = ids[1];
-
+        
+        // Of the stars from the first pairs, only retain the ones that match to a cataloged pair from
+        // the second leg, and that share an id value with the second star from the triangle query
+        // This confirms the same candidate star exists in a pair for the first and second corners of
+        // the triangle
         r_vec
             .retain(|candidate_id| {
                     validation_pairs
@@ -214,12 +254,14 @@ impl Startracker {
             
         
         // check against third leg
-        let (lower_bound, upper_bound) = self.k_vector.get_pairs_range(&legs[2]);
+        let (lower_bound, upper_bound) = self.k_vector.get_pairs_range(&legs[2])?;
         let final_validation_pairs = &self.star_pairs[lower_bound..upper_bound];
         let final_validation_id = ids[2];
 
 
-
+        // The same process as last time, confirming that a pair exists for the between the final
+        // corner of the triangle, and a candidate id
+        // By this point, if the stars are real, there should only be one candidate id left retained
         r_vec   
              .retain(|candidate_id| {
                     final_validation_pairs
@@ -240,31 +282,31 @@ impl Startracker {
     // Returns a list of ALL candidate triangles [ID_C0, ID_C1, ID_C2]
     pub fn query_triangle_topology(&self, legs: &[f64; 3]) -> Result<Vec<[usize; 3]>, StartrackerError> {
         
-        // 1. Get the lists of pairs for each leg
-        // Leg 0: Connects C0 - C1
-        let (s0, e0) = self.k_vector.get_pairs_range(&legs[0]);
-        // Leg 1: Connects C0 - C2
-        let (s1, e1) = self.k_vector.get_pairs_range(&legs[1]);
-        // Leg 2: Connects C1 - C2
-        let (s2, e2) = self.k_vector.get_pairs_range(&legs[2]);
+        // starts and ends for each leg
+        let (s0, e0) = self.k_vector.get_pairs_range(&legs[0])?;
+        let (s1, e1) = self.k_vector.get_pairs_range(&legs[1])?;
+        let (s2, e2) = self.k_vector.get_pairs_range(&legs[2])?;
 
+        // The stars and ends should be different or we cannot check ranges of star pairs
         if s0 == e0 || s1 == e1 || s2 == e2 {
             return Err(StartrackerError::TriangleQueryFailure(String::from("No pairs length - leg does not exist in star pairs")));
         }
+        
 
-        let pairs_leg0 = &self.star_pairs[s0..e0]; // Potential edges for C0-C1
-        let pairs_leg1 = &self.star_pairs[s1..e1]; // Potential edges for C0-C2
-        let pairs_leg2 = &self.star_pairs[s2..e2]; // Potential edges for C1-C2
+        // Form full triangle
+        let pairs_leg0 = &self.star_pairs[s0..e0]; // Leg for first and second centroid
+        let pairs_leg1 = &self.star_pairs[s1..e1]; // Leg for first and third centroid
+        let pairs_leg2 = &self.star_pairs[s2..e2]; // Leg for second and third centroid
 
         let mut valid_candidates = Vec::new();
 
-        // 2. Iterate through Leg 0 to find the "Base" of the triangle
+        // Iterate through Leg 0 to find the "Base" of the triangle
         for pair_0 in pairs_leg0 {
             // We have two possible orientations for this pair:
             // Case A: C0 = pair_0.id_1, C1 = pair_0.id_2
             // Case B: C0 = pair_0.id_2, C1 = pair_0.id_1
             
-            // --- CHECK CASE A ---
+            // Case A
             let c0 = pair_0.id_1;
             let c1 = pair_0.id_2;
             

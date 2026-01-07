@@ -20,7 +20,7 @@ use opencv::{
 //     }
 // }
 
-
+#[derive(Debug, Copy, Clone)]
 pub struct Centroid {
     pub unit_loc: Vector<f64, 3>,
     pub brightness: u64,
@@ -46,7 +46,7 @@ pub struct Starfinder {
     // background_noise threshold
     bg_threshold: u8,
     // Camera model for undistorting pixels
-    camera_model: CameraModel,
+    pub camera_model: CameraModel,
 
     // Impl cam driver / interace here in the future
 
@@ -417,5 +417,22 @@ impl CameraModel {
         for centroid in centroids {
             self.undistort_centroid(centroid);
         }
+    }
+
+    // Project a catalog vector to a pixel
+    pub fn project_vector_to_pixel(&self, vec: &Vector<f64, 3>) -> (f64, f64) {
+        // 1. Project 3D -> 2D (Pinhole)
+        let x_ideal = vec[0] / vec[2];
+        let y_ideal = vec[1] / vec[2];
+
+        // 2. Apply Distortion (Optional for "Rough" check, critical for precision)
+        // For a quick check, we can skip Brown-Conrady re-distortion if K1/K2 are small.
+        // Just applying intrinsics is usually enough to see if you are "close".
+        
+        // 3. Scale to Pixels
+        let u = self.fx * x_ideal + self.cx;
+        let v = self.fy * y_ideal + self.cy;
+        
+        (u, v)
     }
 }
