@@ -1,123 +1,8 @@
-use std::collections::HashMap;
-use std::path::Path;
-
-use serde::{Deserialize, Serialize};
 use aether::math::Vector;
-use image::{GrayImage, ImageReader};
-use image::DynamicImage;
 use crate::logger::ObjectReader;
-use thiserror::Error;
-use heapless;
-use indexmap::IndexMap;
-
-#[derive(Error, Debug)]
-pub enum StartrackerError {
-    #[error("No unique solution found for triangle {0}")]
-    TriangleQueryFailure(String),
-    #[error("One or more of the legs of the triangle being observed does not have a range in the k_vector table, so does not exist in the catalog")]
-    NoStarsInCatalog,
-    #[error("No unique solution found for pyramid")]
-    PyramidConfirmation,
-    #[error("Calculated leg falls outside of fov range / valid bounds")]
-    NoPairsRange
-}
-
-#[derive(Serialize, Deserialize, Debug, Copy, Clone)]
-pub struct Star {
-    pub vector: Vector<f64,3>,
-    pub mag: f32,
-}
-// k_vectors: [f64; 3],
-
-impl Star {
-    pub fn new(vector: Vector<f64, 3>, mag: f32) -> Self {
-        Self { vector, mag }
-    }
-}
-#[derive(Serialize, Deserialize, Debug, Copy, Clone)]
-pub struct StarPair {
-    pub cos_theta: f64,
-    pub id_1: usize,
-    pub id_2: usize,
-}
-impl StarPair {
-    /// Returns the ID of the star paired with `target`, or None if not found.
-    pub fn partner_of(&self, target: usize) -> Option<usize> {
-        if self.id_1 == target {
-            Some(self.id_2)
-        } else if self.id_2 == target {
-            Some(self.id_1)
-        } else {
-            None
-        }
-    }
-}
-pub struct CamConfig {
-    pub fov: f64,
-}
-
-impl  Default for  CamConfig {
-    fn default() -> Self {
-        Self {
-            fov: 27.2
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct K_Vector {
-    k_vector_table: Vec<usize>,
-    cos_min: f64,
-    cos_max: f64,
-    m: f64,
-    epsilon: f64,
-}
-
-
-impl K_Vector {
-    pub fn new(k_vector_table: Vec<usize>, cos_min: f64,cos_max: f64, m: f64, epsilon: f64) -> Self {
-        Self {
-            k_vector_table,
-            cos_min,
-            cos_max,
-            m,
-            epsilon,
-        }
-    }
-
-    // Based on 3 cos(theta) from a triangle of stars, compute the index into the table
-    // Storing the ranges of star pairs we want to look at - pre_computed
-    pub fn get_pairs_range(&self, leg: &f64) -> Result<(usize,usize), StartrackerError> {
-
-        let start_cos = leg - self.epsilon;
-        let end_cos = leg + self.epsilon;
-        // Don't calculate index to access table if the index would be out of bounds
-        if start_cos < self.cos_min || end_cos > (self.cos_max + 0.00001) { 
-            // println!("Pairs range edge case: Cos min: {}, Cos max: {}, Leg: {}",self.cos_min, self.cos_max, leg);
-            return Err(StartrackerError::NoPairsRange)
-        }
-
-        let k_index_start = ((start_cos - self.cos_min) * self.m).floor() as usize;
-        let k_index_end = ((end_cos - self.cos_min) * self.m).floor() as usize;
-
-
-        // Double verify we don't access index out of bounds
-        if k_index_end >= self.k_vector_table.len() - 1 {
-            return Err(StartrackerError::NoPairsRange)
-        }
-        
-        let bound_1 = self.k_vector_table[k_index_start];
-        let bound_2 = self.k_vector_table[k_index_end + 1];
-        Ok((bound_1, bound_2))
-    }
-}
-
-
-struct StartrackerConfig {
-    k_vector_path: Path,
-
-}
-
+use crate::startrack::stardat::{K_Vector, StarPair, Star};
+use crate::startrack::error::StartrackerError;
+use crate::perception::centroiding::Centroid;
 pub struct Startracker {
     k_vector: K_Vector,
     star_pairs: Vec<StarPair>,
@@ -180,8 +65,8 @@ impl Startracker {
 
     // Retrieve the unit vec of a specific star from the starid unit vector
     // Maybe make this by reference later, but we'll see
-    pub fn retrieve_unit_vector(&self, star_id: usize) -> Star {
-        self.star_cat[star_id].clone()
+    pub fn retrieve_unit_vector(&self, star_id: &usize) -> Star {
+        self.star_cat[*star_id].clone()
     }
     // Iterative implementation of checking 
     // pub fn query_triangle(&self, legs: &[f64;3]) -> Result<[usize;3], StartrackerError> {
@@ -339,5 +224,96 @@ impl Startracker {
     // Check to see if a specific pair exists in a list
     fn list_contains_pair(&self, pairs: &[StarPair], a: usize, b: usize) -> bool {
         pairs.iter().any(|p| (p.id_1 == a && p.id_2 == b) || (p.id_1 == b && p.id_2 == a))
+    }
+}
+
+impl Startracker {
+    pub fn pyramid_solve(&self, centroids: Vec<Centroid> ) {
+
+
+        // Core Lost in space identification loop
+        let mut j = 0;
+        let mut k = 0;
+
+        let n = centroids.len();
+        for dj in 1..n-1 {
+            for dk in 1..n-dj {
+                for i in 0..(n-dj-dk) {
+                    j = i + dj;
+                    k = j + dk;
+                    if i == j || j == k || i == k {
+                        continue;
+                    }
+                    // We take the unit vectors relative to the center of the camer, of 3 centroids
+                    let b1 = &centroids[i].unit_loc;
+                    let b2 = &centroids[j].unit_loc;
+                    let b3 = &centroids[k].unit_loc;
+
+                    // We compute their "legs", cosine theta values that can be used to represent the angular distance between
+                    // a pair of stars. Found by the dot product of two unit vectors
+                    let c_theta_1 = b1.dot(b2);
+                    let c_theta_2 = b1.dot(b3);
+                    let c_theta_3 = b2.dot(b3);
+
+                    match &self.query_triangle_topology(&[c_theta_1, c_theta_2, c_theta_3]) {
+                        Ok(triangles) => {
+                            // Unique Solution
+                            let n_triangles = triangles.len();
+                            if n_triangles == 1 {
+                                let star = triangles[0][0];
+                                println!("Star Identified in initial triangle {}", star);
+                                break;
+                            } else if n_triangles > 1 {
+                                for r in 0..n {
+                                    if r == i || r == j || r == k {continue;}
+
+                                    let b4: &Vector<f64, 3> = &centroids[r].unit_loc;
+                                    let confirmation_leg_1 = b1.dot(b4);
+                                    let confirmation_leg_2 = b2.dot(b4);
+                                    let confirmation_leg_3 = b3.dot(b4);
+                                    for triangle in triangles {
+                                        match &self.pyramid_confirmation(
+                                        &[confirmation_leg_1, confirmation_leg_2, confirmation_leg_3], triangle) {
+                                        Ok(star_r_index) => {
+                                            let star_r = &self.retrieve_unit_vector(star_r_index).vector;
+                                            let star_x = &self.retrieve_unit_vector(&triangle[0]).vector;
+                                            let star_y = &self.retrieve_unit_vector(&triangle[1]).vector;
+                                            let star_z = &self.retrieve_unit_vector(&triangle[2]).vector;
+
+                                            // Comparing catalog stars legs and camera legs for confirmation
+                                            let stars_xy_leg = star_x.dot(&star_y);
+                                            let stars_xz_leg = star_x.dot(&star_z);
+                                            // Difference between catalog and camera stars
+                                            println!("--------------");
+                                            println!("Leg IJ: Cam {:.6} vs Cat {:.6} | Diff: {:.2e}", c_theta_1, stars_xy_leg, (c_theta_1 - stars_xy_leg).abs());
+                                            println!("Leg IK: Cam {:.6} vs Cat {:.6} | Diff: {:.2e}", c_theta_2, stars_xz_leg, (c_theta_2 - stars_xz_leg).abs());
+                                            if (c_theta_1 - stars_xy_leg).abs() > 0.0005 {
+                                                println!("False Positive detected by Angle Check.");
+                                                println!("--------------");
+                                            } else {
+                                                println!("Confirmed Match.");
+                                                println!("--------------");
+                                                break; // Break outer loops
+                                            }
+
+                                        }
+                                        Err(startracker_err) => {
+                                            // eprintln!("{}",startracker_err)
+                                        }
+                                    }  
+                                    }
+                                    
+                                }
+                            }
+                            
+                        }
+                        Err(startracker_err) => {
+                            // eprintln!("{}",startracker_err)
+                        }
+                    }
+                    
+                }
+            }
+        }
     }
 }
