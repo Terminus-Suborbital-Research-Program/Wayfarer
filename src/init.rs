@@ -1,6 +1,6 @@
 
-use crate::stars::{
-    CamConfig,
+use crate::startrack::stardat::{
+    // CamConfig,
     Star,
     StarPair,
     K_Vector,
@@ -11,7 +11,7 @@ use crate::logger::{
 };
 use usno_gnc_catalog::{GncCatalogReader, IcrsPropagator};
 use aether::math::Vector;
-
+use crate::perception::camera_model::CameraModel;
 // Create the star table (Set of stars within a certain brightness)
 // Create the star pair vector (set of all stars)
 pub fn init_data() {
@@ -19,11 +19,12 @@ pub fn init_data() {
     let mut star_cat_saver = ObjectWriter::new("stars.dat");
     let mut star_pair_saver= ObjectWriter::new("star_pairs.dat");
 
+    let camera_model = CameraModel::default();
     let mut stars: Vec<Star> = Vec::with_capacity(4424);
-    let cam_config = CamConfig::default();
+    // let cam_config = CamConfig::default();
 
     let mut pairs: Vec<StarPair> = Vec::with_capacity(1_024_127);
-    let min_cos = cam_config.fov.to_radians().cos();
+    let min_cos = camera_model.fov.to_radians().cos();
     let catalog = gnc.records;
     let epoch = 2025.9;
     let record_count = catalog.len();
