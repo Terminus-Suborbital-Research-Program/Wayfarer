@@ -10,5 +10,7 @@ pub enum StartrackerError {
     #[error("No unique solution found for pyramid")]
     PyramidConfirmation,
     #[error("Calculated leg falls outside of fov range / valid bounds")]
-    NoPairsRange
+    NoPairsRange,
+    #[error("No solution found in image")]
+    NoSolution
 }

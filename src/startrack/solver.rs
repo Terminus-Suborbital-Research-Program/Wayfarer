@@ -228,9 +228,9 @@ impl Startracker {
 }
 
 impl Startracker {
-    pub fn pyramid_solve(&self, centroids: Vec<Centroid> ) {
+    pub fn pyramid_solve(&self, centroids: Vec<Centroid> ) -> Result<(Vec<Vector<f64,3>>, Vec<Vector<f64,3>>), StartrackerError> {
 
-
+        // let reference_vectors: Vector<f64,3>
         // Core Lost in space identification loop
         let mut j = 0;
         let mut k = 0;
@@ -245,15 +245,15 @@ impl Startracker {
                         continue;
                     }
                     // We take the unit vectors relative to the center of the camer, of 3 centroids
-                    let b1 = &centroids[i].unit_loc;
-                    let b2 = &centroids[j].unit_loc;
-                    let b3 = &centroids[k].unit_loc;
+                    let b1 = centroids[i].unit_loc;
+                    let b2 = centroids[j].unit_loc;
+                    let b3 = centroids[k].unit_loc;
 
                     // We compute their "legs", cosine theta values that can be used to represent the angular distance between
                     // a pair of stars. Found by the dot product of two unit vectors
-                    let c_theta_1 = b1.dot(b2);
-                    let c_theta_2 = b1.dot(b3);
-                    let c_theta_3 = b2.dot(b3);
+                    let c_theta_1 = b1.dot(&b2);
+                    let c_theta_2 = b1.dot(&b3);
+                    let c_theta_3 = b2.dot(&b3);
 
                     match &self.query_triangle_topology(&[c_theta_1, c_theta_2, c_theta_3]) {
                         Ok(triangles) => {
@@ -267,34 +267,24 @@ impl Startracker {
                                 for r in 0..n {
                                     if r == i || r == j || r == k {continue;}
 
-                                    let b4: &Vector<f64, 3> = &centroids[r].unit_loc;
-                                    let confirmation_leg_1 = b1.dot(b4);
-                                    let confirmation_leg_2 = b2.dot(b4);
-                                    let confirmation_leg_3 = b3.dot(b4);
+                                    let b4: Vector<f64, 3> = centroids[r].unit_loc;
+                                    let confirmation_leg_1 = b1.dot(&b4);
+                                    let confirmation_leg_2 = b2.dot(&b4);
+                                    let confirmation_leg_3 = b3.dot(&b4);
                                     for triangle in triangles {
                                         match &self.pyramid_confirmation(
                                         &[confirmation_leg_1, confirmation_leg_2, confirmation_leg_3], triangle) {
                                         Ok(star_r_index) => {
-                                            let star_r = &self.retrieve_unit_vector(star_r_index).vector;
-                                            let star_x = &self.retrieve_unit_vector(&triangle[0]).vector;
-                                            let star_y = &self.retrieve_unit_vector(&triangle[1]).vector;
-                                            let star_z = &self.retrieve_unit_vector(&triangle[2]).vector;
+                                            let mut reference_vectors: Vec<Vector<f64,3>> = triangle
+                                                                .iter()
+                                                                .map(|id| 
+                                                                        self.retrieve_unit_vector(&id).vector)
+                                                                .collect();
+                                            reference_vectors.push(self.retrieve_unit_vector(&star_r_index).vector);
 
-                                            // Comparing catalog stars legs and camera legs for confirmation
-                                            let stars_xy_leg = star_x.dot(&star_y);
-                                            let stars_xz_leg = star_x.dot(&star_z);
-                                            // Difference between catalog and camera stars
-                                            println!("--------------");
-                                            println!("Leg IJ: Cam {:.6} vs Cat {:.6} | Diff: {:.2e}", c_theta_1, stars_xy_leg, (c_theta_1 - stars_xy_leg).abs());
-                                            println!("Leg IK: Cam {:.6} vs Cat {:.6} | Diff: {:.2e}", c_theta_2, stars_xz_leg, (c_theta_2 - stars_xz_leg).abs());
-                                            if (c_theta_1 - stars_xy_leg).abs() > 0.0005 {
-                                                println!("False Positive detected by Angle Check.");
-                                                println!("--------------");
-                                            } else {
-                                                println!("Confirmed Match.");
-                                                println!("--------------");
-                                                break; // Break outer loops
-                                            }
+                                            let body_vectors = vec![b1, b2, b3, b4];
+                                            
+                                            return Ok((reference_vectors, body_vectors));
 
                                         }
                                         Err(startracker_err) => {
@@ -315,5 +305,6 @@ impl Startracker {
                 }
             }
         }
+        Err(StartrackerError::NoSolution)
     }
 }
