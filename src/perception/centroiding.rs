@@ -1,6 +1,7 @@
 use image::{GrayImage, ImageReader, Luma, RgbImage, Rgb};
 use image::DynamicImage;
 use aether::math::Vector;
+use std::cmp::Reverse;
 
 #[derive(Debug, Copy, Clone)]
 pub struct Centroid {
@@ -35,7 +36,7 @@ impl Default for Starfinder {
     fn default() -> Self {
         Self { 
             threshold: 20u8,
-            bg_threshold: 3u8,
+            bg_threshold: 0u8,
         }
     }
 }
@@ -66,7 +67,8 @@ impl Starfinder {
                 }
             }
         }
-        centroids.sort_by_key(|centroid| centroid.brightness);
+        centroids.sort_by_key(|centroid| Reverse(centroid.brightness));
+        // centroids.sort_by_key(|centroid| centroid.brightness);
         centroids
 
     }
