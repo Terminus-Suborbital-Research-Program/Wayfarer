@@ -58,26 +58,31 @@ fn main() {
     let startracker = Startracker::default();
 
     
-    // match startracker.pyramid_solve(centroids) {
-    match startracker.exhaustive_solve(centroids, 100) {
+    match startracker.pyramid_solve(centroids) {
+    // match startracker.exhaustive_solve(centroids, 100) {
         Ok((reference_vectors, body_vectors)) => {
             let q = quest(&reference_vectors, &body_vectors);
 
             for (reference, body) in reference_vectors.iter().zip(body_vectors.iter()) {
                 let star = q.rotate_vector(*reference);
 
-                let (cat_x, cat_y) = camera_model.project_vector(star).unwrap();
-                let (body_x, body_y) = camera_model.project_vector(*body).unwrap();
-                println!("({:.5},{:.5}),", cat_x, cat_y);
-                println!("({:.5},{:.5}),", body_x, body_y);
-                // println!("Check Coords");
-                // println!("------------");
-                // println!("Cat:  X: {:.5} Y: {:.5}", cat_x, cat_y);
-                // println!("Body: X: {:.5} Y: {:.5}", body_x, body_y);
-                // println!("------------");
+                if let Some((cat_x, cat_y)) = camera_model.project_vector(star) {
+                    if let Some((body_x, body_y)) = camera_model.project_vector(*body) {
+                    println!("Check Coords");
+                    println!("------------");
+                    println!("Cat:  X: {:.5} Y: {:.5}", cat_x, cat_y);
+                    println!("Body: X: {:.5} Y: {:.5}", body_x, body_y);
+                    println!("------------");             
+                    } else {
+                        eprintln!("Measured star body vector failed projection (should be impossible?)");
+                    }
+                } else {
+                    eprintln!("Solved star is behind camera (Bad Quaternion?)");
+                }
+                
+
             }
             // let star = q.rotate_vector(reference_vectors[0]);
-
             // let (cat_x, cat_y) = camera_model.project_vector(star).unwrap();
             // let (body_x, body_y) = camera_model.project_vector(body_vectors[0]).unwrap();
            

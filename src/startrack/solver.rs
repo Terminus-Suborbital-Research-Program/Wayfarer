@@ -1,5 +1,6 @@
 use aether::math::Vector;
 use crate::logger::ObjectReader;
+use crate::perception::camera_model::{self, CameraModel};
 use crate::startrack::stardat::{K_Vector, StarPair, Star};
 use crate::startrack::error::StartrackerError;
 use crate::perception::centroiding::Centroid;
@@ -310,12 +311,21 @@ impl Startracker {
 }
 
 
-// A Debug method to get a many solves for stars
-impl Startracker {                                                   // Lo, the cursed Vec Vec Vector
-    pub fn exhaustive_solve(&self, centroids: Vec<Centroid>, mut n_pyramids: usize) -> Result<(Vec<Vector<f64,3>>, Vec<Vector<f64,3>>), StartrackerError> {
+use crate::startrack::quest::quest;
+use aether::attitude::Quaternion;
+struct Pyramid {
+    reference_vectors: [Vector<f64,3>;4],
+    body_vectors: [Vector<f64,3>;4],
+    quaternion: Quaternion<f64>
+}
 
-        let mut body_vectors: Vec<Vector<f64, 3>> = Vec::new();
-        let mut reference_vectors: Vec<Vector<f64, 3>> = Vec::new();
+
+// A Debug method to get a many solves for stars in the same image - need to fix
+impl Startracker {
+    pub fn exhaustive_solve(&self, centroids: Vec<Centroid>, mut n_pyramids: usize, camera_model: CameraModel) -> Result<(Vec<Vector<f64,3>>, Vec<Vector<f64,3>>), StartrackerError> {
+        let mut reference_vectors: Vec<Vector<f64,3>> = Vec::new();
+        let mut body_vectors: Vec<Vector<f64,3>> = Vec::new();
+
         // Core Lost in space identification loop
         let mut j = 0;
         let mut k = 0;
@@ -360,22 +370,52 @@ impl Startracker {                                                   // Lo, the 
                                         match &self.pyramid_confirmation(
                                         &[confirmation_leg_1, confirmation_leg_2, confirmation_leg_3], triangle) {
                                         Ok(star_r_index) => {
-                                            let mut ref_vect: Vec<Vector<f64,3>> = triangle
-                                                                .iter()
-                                                                .map(|id| 
-                                                                        self.retrieve_unit_vector(&id).vector)
-                                                                .collect();
-                                            ref_vect.push(self.retrieve_unit_vector(&star_r_index).vector);
+                                            // let mut reference_vectors: Vec<Vector<f64,3>> = triangle
+                                            //                     .iter()
+                                            //                     .map(|id| 
+                                            //                             self.retrieve_unit_vector(&id).vector)
+                                            //                     .collect();
+                                            for id in triangle.iter() {
+                                                reference_vectors.push(self.retrieve_unit_vector(&id).vector);
+                                            }
+                                            reference_vectors.push(self.retrieve_unit_vector(&star_r_index).vector);
 
-                                            let bod_vect: Vec<Vector<f64, 3>> = vec![b1, b2, b3, b4];
-                                            reference_vectors.extend(ref_vect);
-                                            body_vectors.extend(bod_vect);
+                                            // let body_vectors = vec![b1, b2, b3, b4];
+                                            body_vectors.push(b1);
+                                            body_vectors.push(b2);
+                                            body_vectors.push(b3);
+                                            body_vectors.push(b4);
+                                            
                                             if n_pyramids == 1 {
                                                 return Ok((reference_vectors, body_vectors));
                                             } else {
-                                                n_pyramids -=1;
+                                                let q = quest(&reference_vectors, &body_vectors);
+
+                                                for (reference, body) in reference_vectors.iter().zip(body_vectors.iter()) {
+                                                    let star = q.rotate_vector(*reference);
+
+                                                    if let Some((cat_x, cat_y)) = camera_model.project_vector(star) {
+                                                        if let Some((body_x, body_y)) = camera_model.project_vector(*body) {
+                                                            println!("({:.5}, {:.5}),", cat_x, cat_y);
+                                                            println!("({:.5}, {:.5}),", body_x, body_y);
+                                                            // println!("Check Coords");
+                                                            // println!("------------");
+                                                            // println!("Cat:  ({:.2}, {:.2})", cat_x, cat_y);
+                                                            // println!("Body: ({:.2}, {:.2})", body_x, body_y);
+                                                            // println!("---");
+                                                        } else {
+                                                            eprintln!("Measured star body vector failed projection (should be impossible?)");
+                                                        }
+                                                    } else {
+                                                        eprintln!("Solved star is behind camera (Bad Quaternion?)");
+                                                    }
+                                                }
+                                                reference_vectors.clear();
+                                                body_vectors.clear();
+                                                n_pyramids -= 1;
                                                 break 'inner;
                                             }
+                                            
 
                                         }
                                         Err(startracker_err) => {
@@ -397,5 +437,6 @@ impl Startracker {                                                   // Lo, the 
             }
         }
         Err(StartrackerError::NoSolution)
+        
     }
 }
