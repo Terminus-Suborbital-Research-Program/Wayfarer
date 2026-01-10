@@ -308,3 +308,94 @@ impl Startracker {
         Err(StartrackerError::NoSolution)
     }
 }
+
+
+// A Debug method to get a many solves for stars
+impl Startracker {                                                   // Lo, the cursed Vec Vec Vector
+    pub fn exhaustive_solve(&self, centroids: Vec<Centroid>, mut n_pyramids: usize) -> Result<(Vec<Vector<f64,3>>, Vec<Vector<f64,3>>), StartrackerError> {
+
+        let mut body_vectors: Vec<Vector<f64, 3>> = Vec::new();
+        let mut reference_vectors: Vec<Vector<f64, 3>> = Vec::new();
+        // Core Lost in space identification loop
+        let mut j = 0;
+        let mut k = 0;
+
+        let n = centroids.len();
+        for dj in 1..n-1 {
+            for dk in 1..n-dj {
+                'inner: for i in 0..(n-dj-dk) {
+                    j = i + dj;
+                    k = j + dk;
+                    if i == j || j == k || i == k {
+                        continue;
+                    }
+                    // We take the unit vectors relative to the center of the camer, of 3 centroids
+                    let b1 = centroids[i].unit_loc;
+                    let b2 = centroids[j].unit_loc;
+                    let b3 = centroids[k].unit_loc;
+
+                    // We compute their "legs", cosine theta values that can be used to represent the angular distance between
+                    // a pair of stars. Found by the dot product of two unit vectors
+                    let c_theta_1 = b1.dot(&b2);
+                    let c_theta_2 = b1.dot(&b3);
+                    let c_theta_3 = b2.dot(&b3);
+
+                    match &self.query_triangle_topology(&[c_theta_1, c_theta_2, c_theta_3]) {
+                        Ok(triangles) => {
+                            // Unique Solution
+                            let n_triangles = triangles.len();
+                            if n_triangles == 1 {
+                                let star = triangles[0][0];
+                                println!("Star Identified in initial triangle {}", star);
+                                break;
+                            } else if n_triangles > 1 {
+                                for r in 0..n {
+                                    if r == i || r == j || r == k {continue;}
+
+                                    let b4: Vector<f64, 3> = centroids[r].unit_loc;
+                                    let confirmation_leg_1 = b1.dot(&b4);
+                                    let confirmation_leg_2 = b2.dot(&b4);
+                                    let confirmation_leg_3 = b3.dot(&b4);
+                                    for triangle in triangles {
+                                        match &self.pyramid_confirmation(
+                                        &[confirmation_leg_1, confirmation_leg_2, confirmation_leg_3], triangle) {
+                                        Ok(star_r_index) => {
+                                            let mut ref_vect: Vec<Vector<f64,3>> = triangle
+                                                                .iter()
+                                                                .map(|id| 
+                                                                        self.retrieve_unit_vector(&id).vector)
+                                                                .collect();
+                                            ref_vect.push(self.retrieve_unit_vector(&star_r_index).vector);
+
+                                            let bod_vect: Vec<Vector<f64, 3>> = vec![b1, b2, b3, b4];
+                                            reference_vectors.extend(ref_vect);
+                                            body_vectors.extend(bod_vect);
+                                            if n_pyramids == 1 {
+                                                return Ok((reference_vectors, body_vectors));
+                                            } else {
+                                                n_pyramids -=1;
+                                                break 'inner;
+                                            }
+
+                                        }
+                                        Err(startracker_err) => {
+                                            // eprintln!("{}",startracker_err)
+                                        }
+                                    }  
+                                    }
+                                    
+                                }
+                            }
+                            
+                        }
+                        Err(startracker_err) => {
+                            // eprintln!("{}",startracker_err)
+                        }
+                    }
+                    
+                }
+            }
+        }
+        Err(StartrackerError::NoSolution)
+    }
+}

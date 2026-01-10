@@ -28,14 +28,29 @@ impl Default for CameraModel {
             cy: 971.5,
             // k 1..3 are coefficients that account for warping around the edges / corners (Radial Coefficients)
             k1: 0.51059,
-            k2: -19.48679,
-            k3: 171.20994,
+            k2: -9.5,
+            k3: 0.0,
+            // k2: -19.5,
+            // k3: 171.20994,
             // p1 & 2 are coefficients that account for lens crookedness (tilt) relative to the sensor
             p1: -0.00291,
             p2: 0.0000206,
         }
     }
 }
+
+/*
+Benchmarks:
+
+k3 0 ; k2 -8.0
+--- VERIFICATION ---
+Star Error: 0.06002 degrees
+Star Error: 0.05901 degrees
+Star Error: 0.04115 degrees
+Star Error: 0.03648 degrees
+Average Error: 0.04917 degrees
+
+*/
 impl CameraModel {
 
     pub fn new(
@@ -96,6 +111,43 @@ impl CameraModel {
         raw_vector = raw_vector.normalize();
 
         centroid.unit_loc.data = raw_vector.data;
+    }
+
+    pub fn project_vector(&self, v: Vector<f64,3>) -> Option<(f64,f64)> {
+        let x = v[0];
+        let y = v[1];
+        let z = v[2];
+        
+        if z <= 0.0 {
+            return None;
+        }
+        // Pinhole Projection: Set the image plane distance to 1 for a normal 2d x y coordinate system
+        // x = f(X/Z), y = f(Y/Z)
+        let x_ideal = x / z;
+        let y_ideal = y / z;
+
+
+        let r2 = x_ideal.powi(2) + y_ideal.powi(2);
+        let r4 = r2.powi(2);
+        let r6 = r2 * r4;
+
+        // Radial Distortion - you can just gpt these equations but the explanation on distortion is intersting
+        // https://www.foamcoreprint.com/blog/what-are-calibration-targets
+
+        let k_radial = 1.0 + self.k1 * r2 + self.k2 * r4 + self.k3 * r6;
+
+        // Tangential Distortion
+        let delta_x = 2.0 * self.p1 * x_ideal * y_ideal + self.p2 * (r2 + 2.0 * x_ideal.powi(2));
+        let delta_y = self.p1 * (r2 + 2.0 * y_ideal.powi(2)) + 2.0 * self.p2 * x_ideal * y_ideal;
+
+        let x_distorted = x_ideal * k_radial + delta_x;
+        let y_distorted = y_ideal * k_radial + delta_y;
+
+        // Convert to Pixels (Intrinsics)
+        let pixel_x = self.fx * x_distorted + self.cx;
+        let pixel_y = self.fy * y_distorted + self.cy;
+
+        Some((pixel_x, pixel_y))
     }
 
     pub fn undistort_centroids(&self, centroids: &mut [Centroid]){
