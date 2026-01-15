@@ -1,5 +1,10 @@
 #![allow(warnings)]
 
+use std::io;
+use std::fs::{self, DirEntry};
+use std::path::Path;
+
+
 use aether::math::{Matrix, Vector};
 
 use bincode::{
@@ -34,30 +39,74 @@ use perception::{
 use image::{GrayImage, ImageReader, Luma, RgbImage};
 use image::DynamicImage;
 
+use crate::perception::camera_model;
+use std::time::Instant;
 
+mod tests;
 
-fn main() {
+fn main() -> io::Result<()>{
     // init_data();
     // init_k_vector();
-
-    let path = "/home/supergoodname77/Desktop/Elara/startracking/images/set1/bright-VISNIR-310ms_24d1g_50ict_0bl_0d80gam_set1_1.tiff";
-
-    let img = ImageReader::open(path).unwrap().decode().unwrap();
-    let mut gray_image = GrayImage::from(img.clone());
-
+    // let path = "/home/supergoodname77/Desktop/Elara/startracking/images/set1/bright-VISNIR-310ms_24d1g_50ict_0bl_0d80gam_set1_1.tiff";
+    // let camera_view_centroids: Vec<Centroid> = centroids.iter().cloned().collect();
+    
     let mut starfinder = Starfinder::default();
-
-    let mut centroids = starfinder.star_find(&mut gray_image);
-
-    let camera_view_centroids: Vec<Centroid> = centroids.iter().cloned().collect();
-
     let camera_model = CameraModel::default();
-
-    camera_model.undistort_centroids(&mut centroids);
-
     let startracker = Startracker::default();
 
+    for entry in fs::read_dir("/home/supergoodname77/Desktop/Elara/startracking/images/mixed")? {
+        let entry = entry?;
+        let path = entry.path();
+
+        if path.is_file() {
+            // 1. Measure IO/Decoding
+            let t0 = Instant::now();
+            let img = ImageReader::open(&path).unwrap().decode().unwrap();
+            let mut gray_image = GrayImage::from(img);
+            let t_load = t0.elapsed();
+
+            // 2. Measure Star Finding
+            // Note: This is usually the bottleneck due to pixel iterating
+            let t1 = Instant::now();
+            let mut centroids = starfinder.star_find(&mut gray_image);
+            let t_find = t1.elapsed();
+
+            // 3. Measure Undistortion
+            let t2 = Instant::now();
+            camera_model.undistort_centroids(&mut centroids);
+            let t_undist = t2.elapsed();
+
+            // 4. Measure Solver (Pyramid + QUEST)
+            let t3 = Instant::now();
+            let result = startracker.pyramid_solve(centroids); // or exhaustive_solve
+            let t_solve = t3.elapsed();
+
+            let t_total = t0.elapsed();
+            // Print table row
+            println!("| {:<30} | {:<10.3} | {:<10.3} | {:<10.3} | {:<10.3} | {:<10.3} |",
+                path.file_name().unwrap().to_string_lossy(),
+                t_load.as_secs_f64() * 1000.0,
+                t_find.as_secs_f64() * 1000.0,
+                t_undist.as_secs_f64() * 1000.0,
+                t_solve.as_secs_f64() * 1000.0,
+                t_total.as_secs_f64() * 1000.0
+            );
+
+        }
+
+    }
+
     
+    
+    Ok(())
+}
+
+
+fn full_solve(path: &str, starfinder: Starfinder, camera_model: CameraModel, startracker: Startracker) {
+    let img = ImageReader::open(path).unwrap().decode().unwrap();
+    let mut gray_image = GrayImage::from(img);
+    let mut centroids = starfinder.star_find(&mut gray_image);
+    camera_model.undistort_centroids(&mut centroids);
     match startracker.pyramid_solve(centroids) {
     // match startracker.exhaustive_solve(centroids, 100) {
         Ok((reference_vectors, body_vectors)) => {
@@ -85,7 +134,7 @@ fn main() {
             // let star = q.rotate_vector(reference_vectors[0]);
             // let (cat_x, cat_y) = camera_model.project_vector(star).unwrap();
             // let (body_x, body_y) = camera_model.project_vector(body_vectors[0]).unwrap();
-           
+        
         }
 
         Err(e) => {
@@ -93,8 +142,6 @@ fn main() {
         }
     }
 }
-
-
 /*
 Q: Vector { data: [0.22732334822563513, 0.16095940395572375, -0.26835912918251825, 0.9221711031116218] }
 
