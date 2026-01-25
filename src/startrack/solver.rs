@@ -261,9 +261,16 @@ impl Startracker {
                             // Unique Solution
                             let n_triangles = triangles.len();
                             if n_triangles == 1 {
-                                let star = triangles[0][0];
-                                println!("Star Identified in initial triangle {}", star);
-                                break;
+
+                                let triangle = triangles[0];
+                                let mut reference_vectors: Vec<Vector<f64,3>> = triangle
+                                                                .iter()
+                                                                .map(|id| 
+                                                                        self.retrieve_unit_vector(&id).vector)
+                                                                .collect();
+                                let body_vectors = vec![b1, b2, b3];
+
+                                return Ok((reference_vectors, body_vectors));
                             } else if n_triangles > 1 {
                                 for r in 0..n {
                                     if r == i || r == j || r == k {continue;}
@@ -313,10 +320,12 @@ impl Startracker {
 
 use crate::startrack::quest::quest;
 use aether::attitude::Quaternion;
+use aether::reference_frame::Body;
+use aether::reference_frame::ICRF;
 struct Pyramid {
     reference_vectors: [Vector<f64,3>;4],
     body_vectors: [Vector<f64,3>;4],
-    quaternion: Quaternion<f64>
+    quaternion: Quaternion<f64,ICRF<f64>,Body<f64>>
 }
 
 

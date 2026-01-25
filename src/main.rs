@@ -1,29 +1,31 @@
-#![allow(warnings)]
+// #![allow(warnings)]
+mod logger;
+mod startrack;
+mod init;
+mod perception;
+mod tests;
 
+use std::io;
+use std::fs::{self, DirEntry};
+use std::path::Path;
 use aether::math::{Matrix, Vector};
+use image::{GrayImage, ImageReader, Luma, RgbImage};
+use image::DynamicImage;
+use std::time::Instant;
 
 use bincode::{
     config::standard,
     serde::{decode_from_std_read, encode_into_std_write},
 };
-mod logger;
 use logger::{
     ObjectWriter,
     ObjectReader
 };
-mod startrack;
 use startrack::{
     solver::Startracker,
     quest::quest,
 };
-// mod tests;
-mod init;
 use init::{init_data, init_k_vector};
-
-// mod image_tools;
-mod perception;
-
-
 use perception::{
     camera_model::CameraModel,
     centroiding::{
@@ -31,33 +33,31 @@ use perception::{
         Centroid,
     }
 };
-use image::{GrayImage, ImageReader, Luma, RgbImage};
-use image::DynamicImage;
 
 
-
-fn main() {
+fn main() -> io::Result<()>{
     // init_data();
     // init_k_vector();
-
+    // let camera_view_centroids: Vec<Centroid> = centroids.iter().cloned().collect();
+    
     let path = "/home/supergoodname77/Desktop/Elara/startracking/images/set1/bright-VISNIR-310ms_24d1g_50ict_0bl_0d80gam_set1_1.tiff";
-
-    let img = ImageReader::open(path).unwrap().decode().unwrap();
-    let mut gray_image = GrayImage::from(img.clone());
-
     let mut starfinder = Starfinder::default();
-
-    let mut centroids = starfinder.star_find(&mut gray_image);
-
-    let camera_view_centroids: Vec<Centroid> = centroids.iter().cloned().collect();
-
     let camera_model = CameraModel::default();
-
-    camera_model.undistort_centroids(&mut centroids);
-
     let startracker = Startracker::default();
 
+    full_solve(path, starfinder, camera_model, startracker);
+
     
+    
+    Ok(())
+}
+
+
+fn full_solve(path: &str, starfinder: Starfinder, camera_model: CameraModel, startracker: Startracker) {
+    let img = ImageReader::open(path).unwrap().decode().unwrap();
+    let mut gray_image = GrayImage::from(img);
+    let mut centroids = starfinder.star_find(&mut gray_image);
+    camera_model.undistort_centroids(&mut centroids);
     match startracker.pyramid_solve(centroids) {
     // match startracker.exhaustive_solve(centroids, 100) {
         Ok((reference_vectors, body_vectors)) => {
@@ -85,7 +85,7 @@ fn main() {
             // let star = q.rotate_vector(reference_vectors[0]);
             // let (cat_x, cat_y) = camera_model.project_vector(star).unwrap();
             // let (body_x, body_y) = camera_model.project_vector(body_vectors[0]).unwrap();
-           
+        
         }
 
         Err(e) => {
@@ -93,8 +93,6 @@ fn main() {
         }
     }
 }
-
-
 /*
 Q: Vector { data: [0.22732334822563513, 0.16095940395572375, -0.26835912918251825, 0.9221711031116218] }
 
