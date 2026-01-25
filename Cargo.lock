@@ -10,17 +10,117 @@ checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 
 [[package]]
 name = "aether"
-version = "0.1.0"
+version = "0.1.1"
+source = "git+https://github.com/AtmoPierce/aether.git#25972be9740c902bf24eab814896b07e729e6eb6"
+dependencies = [
+ "aether_benchmark",
+ "aether_core",
+ "aether_examples",
+ "aether_fluids",
+ "aether_graphics",
+ "aether_ml",
+ "aether_models",
+ "aether_opt",
+ "aether_rand",
+ "aether_shapes",
+ "aether_stats",
+]
+
+[[package]]
+name = "aether_benchmark"
+version = "0.1.1"
+source = "git+https://github.com/AtmoPierce/aether.git#25972be9740c902bf24eab814896b07e729e6eb6"
+dependencies = [
+ "minstant",
+ "once_cell",
+]
+
+[[package]]
+name = "aether_core"
+version = "0.1.1"
+source = "git+https://github.com/AtmoPierce/aether.git#25972be9740c902bf24eab814896b07e729e6eb6"
+dependencies = [
+ "num-traits",
+ "serde",
+]
+
+[[package]]
+name = "aether_examples"
+version = "0.1.1"
+source = "git+https://github.com/AtmoPierce/aether.git#25972be9740c902bf24eab814896b07e729e6eb6"
 dependencies = [
  "aether_core",
 ]
 
 [[package]]
-name = "aether_core"
-version = "0.1.0"
+name = "aether_fluids"
+version = "0.1.1"
+source = "git+https://github.com/AtmoPierce/aether.git#25972be9740c902bf24eab814896b07e729e6eb6"
+
+[[package]]
+name = "aether_graphics"
+version = "0.1.1"
+source = "git+https://github.com/AtmoPierce/aether.git#25972be9740c902bf24eab814896b07e729e6eb6"
 dependencies = [
+ "aether_core",
  "num-traits",
+]
+
+[[package]]
+name = "aether_ml"
+version = "0.1.1"
+source = "git+https://github.com/AtmoPierce/aether.git#25972be9740c902bf24eab814896b07e729e6eb6"
+dependencies = [
+ "aether_core",
+ "aether_opt",
+ "csv",
+ "minstant",
+ "num-traits",
+ "once_cell",
  "serde",
+]
+
+[[package]]
+name = "aether_models"
+version = "0.1.1"
+source = "git+https://github.com/AtmoPierce/aether.git#25972be9740c902bf24eab814896b07e729e6eb6"
+dependencies = [
+ "aether_core",
+]
+
+[[package]]
+name = "aether_opt"
+version = "0.1.1"
+source = "git+https://github.com/AtmoPierce/aether.git#25972be9740c902bf24eab814896b07e729e6eb6"
+dependencies = [
+ "aether_core",
+ "aether_rand",
+ "num-traits",
+]
+
+[[package]]
+name = "aether_rand"
+version = "0.1.1"
+source = "git+https://github.com/AtmoPierce/aether.git#25972be9740c902bf24eab814896b07e729e6eb6"
+
+[[package]]
+name = "aether_shapes"
+version = "0.1.1"
+source = "git+https://github.com/AtmoPierce/aether.git#25972be9740c902bf24eab814896b07e729e6eb6"
+dependencies = [
+ "aether_core",
+ "num-traits",
+]
+
+[[package]]
+name = "aether_stats"
+version = "0.1.1"
+source = "git+https://github.com/AtmoPierce/aether.git#25972be9740c902bf24eab814896b07e729e6eb6"
+dependencies = [
+ "aether_core",
+ "aether_opt",
+ "aether_rand",
+ "num-traits",
 ]
 
 [[package]]
@@ -70,7 +170,7 @@ checksum = "0ae92a5119aa49cdbcf6b9f893fe4e1d98b04ccbf82ee0584ad948a44a734dea"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.111",
 ]
 
 [[package]]
@@ -210,7 +310,7 @@ checksum = "89385e82b5d1821d2219e0b095efa2cc1f246cbf99080f3be46a1a85c0d392d9"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.111",
 ]
 
 [[package]]
@@ -352,6 +452,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "ctor"
+version = "0.1.26"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6d2301688392eb071b0bf1a37be05c469d3cc4dbbd95df672fe28ab021e6a096"
+dependencies = [
+ "quote",
+ "syn 1.0.109",
+]
+
+[[package]]
 name = "dunce"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -380,7 +490,7 @@ checksum = "44f23cf4b44bfce11a86ace86f8a73ffdec849c9fd00a386a53d278bd9e81fb3"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.111",
 ]
 
 [[package]]
@@ -421,7 +531,7 @@ checksum = "a0aca10fb742cb43f9e7bb8467c91aa9bcb8e3ffbc6a6f7389bb93ffc920577d"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.111",
 ]
 
 [[package]]
@@ -577,7 +687,7 @@ checksum = "c34819042dc3d3971c46c2190835914dfbe0c3c13f61449b2997f4e9722dfa60"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.111",
 ]
 
 [[package]]
@@ -679,6 +789,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "minstant"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1fb9b5c752f145ac5046bccc3c4f62892e3c950c1d1eab80c5949cd68a2078db"
+dependencies = [
+ "ctor",
+ "web-time",
+]
+
+[[package]]
 name = "moxcms"
 version = "0.7.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -705,7 +825,7 @@ checksum = "4568f25ccbd45ab5d5603dc34318c1ec56b117531781260002151b8530a9f931"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.111",
 ]
 
 [[package]]
@@ -747,7 +867,7 @@ checksum = "ed3955f1a9c7c0c15e092f9c887db08b1fc683305fdf6eb6684f22555355e202"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.111",
 ]
 
 [[package]]
@@ -889,7 +1009,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "52717f9a02b6965224f95ca2a81e2e0c5c43baacd28ca057577988930b6c3d5b"
 dependencies = [
  "quote",
- "syn",
+ "syn 2.0.111",
 ]
 
 [[package]]
@@ -909,7 +1029,7 @@ checksum = "7347867d0a7e1208d93b46767be83e2b8f978c3dad35f775ac8d8847551d6fe1"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.111",
 ]
 
 [[package]]
@@ -1130,7 +1250,7 @@ checksum = "bd83f5f173ff41e00337d97f6572e416d022ef8a19f371817259ae960324c482"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.111",
 ]
 
 [[package]]
@@ -1178,7 +1298,7 @@ checksum = "d540f220d3187173da220f885ab66608367b6574e925011a9353e4badda91d79"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.111",
 ]
 
 [[package]]
@@ -1222,6 +1342,17 @@ checksum = "6ce2be8dc25455e1f91df71bfa12ad37d7af1092ae736f3a6cd0e37bc7810596"
 
 [[package]]
 name = "syn"
+version = "1.0.109"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "72b64191b275b66ffe2469e8af2c1cfe3bafa67b529ead792a6d0160888b4237"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "unicode-ident",
+]
+
+[[package]]
+name = "syn"
 version = "2.0.111"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "390cc9a294ab71bdb1aa2e99d13be9c753cd2d7bd6560c77118597410c4d2e87"
@@ -1248,7 +1379,7 @@ checksum = "3ff15c8ecd7de3849db632e14d18d2571fa09dfc5ed93479bc4485c7a517c913"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.111",
 ]
 
 [[package]]
@@ -1376,7 +1507,7 @@ dependencies = [
  "bumpalo",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.111",
  "wasm-bindgen-shared",
 ]
 
@@ -1402,6 +1533,16 @@ dependencies = [
  "serde",
  "thiserror",
  "usno_gnc_catalog",
+]
+
+[[package]]
+name = "web-time"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5a6580f308b1fad9207618087a65c04e7a10bc77e02c8e84e9b00dd4b12fa0bb"
+dependencies = [
+ "js-sys",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -1463,7 +1604,7 @@ checksum = "053e2e040ab57b9dc951b72c264860db7eb3b0200ba345b4e4c3b14f67855ddf"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.111",
 ]
 
 [[package]]
@@ -1474,7 +1615,7 @@ checksum = "3f316c4a2570ba26bbec722032c4099d8c8bc095efccdc15688708623367e358"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.111",
 ]
 
 [[package]]
@@ -1549,7 +1690,7 @@ checksum = "d8a8d209fdf45cf5138cbb5a506f6b52522a25afccc534d1475dad8e31105c6a"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.111",
 ]
 
 [[package]]

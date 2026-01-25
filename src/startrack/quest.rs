@@ -1,8 +1,13 @@
 use aether::math::{Vector,Matrix};
 use aether::coordinate::Cartesian;
 use aether::attitude::Quaternion;
+use aether::reference_frame::ReferenceFrame;
+use aether::reference_frame::Body;
+use aether::reference_frame::ICRF;
 
-pub fn quest(reference_vectors: &Vec<Vector<f64,3>>, body_vectors: &Vec<Vector<f64,3>>) -> Quaternion<f64> {
+
+
+pub fn quest(reference_vectors: &Vec<Vector<f64,3>>, body_vectors: &Vec<Vector<f64,3>>) -> Quaternion<f64, ICRF<f64>,Body<f64>> {
     // Need to confirm that reference vectors and body vectors are the same length
         // and definitely returned properly from pyramid solve
         // This should be fine but it would be better to be compiler enforced,
@@ -65,29 +70,94 @@ pub fn quest(reference_vectors: &Vec<Vector<f64,3>>, body_vectors: &Vec<Vector<f
         // let norm = 1.0 / (p.dot(&p) + w.powi(2)).sqrt();
 
         // Shuster's algorithm, so negate rotational components
-        let q = Quaternion::new(w, -p.data[0], -p.data[1], -p.data[2]).normalized();
+        let q = Quaternion::new(w, p.data[0], p.data[1], p.data[2]).normalized();
         
         // let q: Vector<f64,4> = Vector::new([-p.data[0], -p.data[1], -p.data[2], w]) * norm;
-        // println!("Q: {:?}", q);
-        // println!("");
-        // println!("Check Angle");
-        // let mut total_error = 0.0;
-        // for (r, b) in reference_vectors.iter().zip(body_vectors.iter()) {
+        println!("Q: {:?}", q);
+        println!("");
+        println!("Check Angle");
+        let mut total_error = 0.0;
+        for (r, b) in reference_vectors.iter().zip(body_vectors.iter()) {
             
-        //     let b_predicted = q.rotate_vector(*r);
+            let b_predicted = q.rotate_vector(*r);
             
             
-        //     let dot = b.dot(&b_predicted).min(1.0).max(-1.0); // Clamp for safety
-        //     let angle_rad = dot.acos();
-        //     let angle_deg = angle_rad.to_degrees();
+            let dot = b.dot(&b_predicted).min(1.0).max(-1.0); // Clamp for safety
+            let angle_rad = dot.acos();
+            let angle_deg = angle_rad.to_degrees();
             
-        //     println!("Star Error: {:.5} degrees", angle_deg);
-        //     total_error += angle_deg;
-        // }
-        // println!("Average Error: {:.5} degrees", total_error / reference_vectors.len() as f64);
-        // println!("");
+            println!("Star Error: {:.5} degrees", angle_deg);
+            total_error += angle_deg;
+        }
+        println!("Average Error: {:.5} degrees", total_error / reference_vectors.len() as f64);
+        println!("");
 
 
+        return q;
+}
+
+pub fn quest_f32 (reference_vectors: &Vec<Vector<f64,3>>, body_vectors: &Vec<Vector<f64,3>>) -> Quaternion<f32, ICRF<f32>,Body<f32>> {
+    // Need to confirm that reference vectors and body vectors are the same length
+        // and definitely returned properly from pyramid solve
+        // This should be fine but it would be better to be compiler enforced,
+        // however going with raw vectors right now instead of cartesian
+        let weights = reference_vectors.len();
+        let mut B: Matrix<f64, 3, 3>  = Matrix::zeros();
+        // let mut Z: Vector<f64,3> = Vector::zeros();
+        // This is an assumption that all stars are equally trusted.
+        // If this is made more sophisticated later, weights may vary and can be collected in an iterable 
+        // data structure, and then each outer product of each star is multipied by the amount we trust
+        // that specific star
+        let weight = 1.0 / weights as f64;
+        for (r, b) in reference_vectors.iter().zip(body_vectors.iter()) {
+            let m = Matrix::outer(b, r);
+            B = B + (m * weight);
+
+            // let v = b.cross(r);
+            // Z = Z + (v * weight)
+        }
+
+        let Z = Vector::new([
+            B[(1, 2)] - B[(2, 1)],
+            B[(2, 0)] - B[(0, 2)],
+            B[(0, 1)] - B[(1, 0)]
+        ]);
+
+        let sigma = B.trace();
+        // Symmetric MAtrix
+        let S = B + B.transpose();
+
+        // We only need the trace of the adjoint, which is the sum of the diagonal of the adjoint
+        // The diagonal of the adjoint is the same as the diagnoal of the cofactor, so we can just
+        // only calculate the diagonal cofactor values, and add them to get the same result
+        let adj_00 = S[1][1] * S[2][2] - S[1][2] * S[2][1];
+        let adj_11 = S[0][0] * S[2][2] - S[0][2] * S[2][0];
+        let adj_22 = S[0][0] * S[1][1] - S[0][1] * S[1][0];
+        let k = adj_00 + adj_11 + adj_22;
+
+        // For the newton raphson optimized lambda we need alpha, beta, delta, and ceta
+        let a = sigma.powi(2) - k;
+
+        let b = sigma.powi(2) + Z.dot(&Z);
+
+        let c = S.determinant() + Z.dot(&(S * Z));
+        // let d = S.determinant() + Z.dot(&(S *(S * Z)));
+        let d = Z.dot(&(S *(S * Z)));
+
+
+        let lambda_guess = 1.0;
+        let lambda_max = newton_raphson(a, b, c, d, sigma, lambda_guess);
+
+        let alpha = lambda_max + sigma;
+        let I: Matrix<f64, 3, 3> = Matrix::identity();
+        let X = (I * alpha) - S;
+
+        let p = cofactor(&X).transpose() * Z;
+
+        let w = X.determinant();
+
+        let q = Quaternion::new(w as f32, -p.data[0] as f32 , -p.data[1] as f32 , -p.data[2] as f32 ).normalized();
+        
         return q;
 }
 

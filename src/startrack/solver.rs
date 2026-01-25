@@ -320,10 +320,12 @@ impl Startracker {
 
 use crate::startrack::quest::quest;
 use aether::attitude::Quaternion;
+use aether::reference_frame::Body;
+use aether::reference_frame::ICRF;
 struct Pyramid {
     reference_vectors: [Vector<f64,3>;4],
     body_vectors: [Vector<f64,3>;4],
-    quaternion: Quaternion<f64>
+    quaternion: Quaternion<f64,ICRF<f64>,Body<f64>>
 }
 
 
