@@ -1426,6 +1426,7 @@ checksum = "6d49784317cd0d1ee7ec5c716dd598ec5b4483ea832a2dced265471cc0f690ae"
 [[package]]
 name = "usno_gnc_catalog"
 version = "0.1.0"
+source = "git+https://git.nuntius.us/atmo/angel.git#2679b4aca0772ea06b8ac873ed7ec511744ebb59"
 dependencies = [
  "csv",
  "rand",
