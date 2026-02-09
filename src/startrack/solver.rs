@@ -361,13 +361,11 @@ impl Startracker {
 
                     match &self.query_triangle_topology(&[c_theta_1, c_theta_2, c_theta_3]) {
                         Ok(triangles) => {
-                            // Unique Solution
                             let n_triangles = triangles.len();
+                            
                             if n_triangles == 1 {
-                                let star = triangles[0][0];
-                                println!("Star Identified in initial triangle {}", star);
-                                break;
-                            } else if n_triangles > 1 {
+                                // Unique Solution: We must still find a 4th star to form the pyramid
+                                let triangle = triangles[0];
                                 for r in 0..n {
                                     if r == i || r == j || r == k {continue;}
 
@@ -375,21 +373,73 @@ impl Startracker {
                                     let confirmation_leg_1 = b1.dot(&b4);
                                     let confirmation_leg_2 = b2.dot(&b4);
                                     let confirmation_leg_3 = b3.dot(&b4);
-                                    for triangle in triangles {
-                                        match &self.pyramid_confirmation(
-                                        &[confirmation_leg_1, confirmation_leg_2, confirmation_leg_3], triangle) {
+                                    
+                                    // Verify the 4th star
+                                    match &self.pyramid_confirmation(
+                                        &[confirmation_leg_1, confirmation_leg_2, confirmation_leg_3], &triangle) {
                                         Ok(star_r_index) => {
-                                            // let mut reference_vectors: Vec<Vector<f64,3>> = triangle
-                                            //                     .iter()
-                                            //                     .map(|id| 
-                                            //                             self.retrieve_unit_vector(&id).vector)
-                                            //                     .collect();
+                                            // Success: Populate vectors
                                             for id in triangle.iter() {
                                                 reference_vectors.push(self.retrieve_unit_vector(&id).vector);
                                             }
                                             reference_vectors.push(self.retrieve_unit_vector(&star_r_index).vector);
 
-                                            // let body_vectors = vec![b1, b2, b3, b4];
+                                            body_vectors.push(b1);
+                                            body_vectors.push(b2);
+                                            body_vectors.push(b3);
+                                            body_vectors.push(b4);
+                                            
+                                            if n_pyramids == 1 {
+                                                return Ok((reference_vectors, body_vectors));
+                                            } else {
+                                                // Debug/Verification logic for multiple pyramids
+                                                let q = quest(&reference_vectors, &body_vectors);
+
+                                                for (reference, body) in reference_vectors.iter().zip(body_vectors.iter()) {
+                                                    let star = q.rotate_vector(*reference);
+
+                                                    if let Some((cat_x, cat_y)) = camera_model.project_vector(star) {
+                                                        if let Some((body_x, body_y)) = camera_model.project_vector(*body) {
+                                                            println!("({:.5}, {:.5}),", cat_x, cat_y);
+                                                            println!("({:.5}, {:.5}),", body_x, body_y);
+                                                        } else {
+                                                            eprintln!("Measured star body vector failed projection (should be impossible?)");
+                                                        }
+                                                    } else {
+                                                        eprintln!("Solved star is behind camera (Bad Quaternion?)");
+                                                    }
+                                                }
+                                                reference_vectors.clear();
+                                                body_vectors.clear();
+                                                n_pyramids -= 1;
+                                                break 'inner;
+                                            }
+                                        }
+                                        Err(_startracker_err) => {
+                                            // 4th star did not match this triangle, continue searching
+                                        }
+                                    }
+                                }
+
+                            } else if n_triangles > 1 {
+                                // Multiple candidates, try to disambiguate with 4th star
+                                for r in 0..n {
+                                    if r == i || r == j || r == k {continue;}
+
+                                    let b4: Vector<f64, 3> = centroids[r].unit_loc;
+                                    let confirmation_leg_1 = b1.dot(&b4);
+                                    let confirmation_leg_2 = b2.dot(&b4);
+                                    let confirmation_leg_3 = b3.dot(&b4);
+                                    
+                                    for triangle in triangles {
+                                        match &self.pyramid_confirmation(
+                                        &[confirmation_leg_1, confirmation_leg_2, confirmation_leg_3], triangle) {
+                                        Ok(star_r_index) => {
+                                            for id in triangle.iter() {
+                                                reference_vectors.push(self.retrieve_unit_vector(&id).vector);
+                                            }
+                                            reference_vectors.push(self.retrieve_unit_vector(&star_r_index).vector);
+
                                             body_vectors.push(b1);
                                             body_vectors.push(b2);
                                             body_vectors.push(b3);
@@ -407,11 +457,6 @@ impl Startracker {
                                                         if let Some((body_x, body_y)) = camera_model.project_vector(*body) {
                                                             println!("({:.5}, {:.5}),", cat_x, cat_y);
                                                             println!("({:.5}, {:.5}),", body_x, body_y);
-                                                            // println!("Check Coords");
-                                                            // println!("------------");
-                                                            // println!("Cat:  ({:.2}, {:.2})", cat_x, cat_y);
-                                                            // println!("Body: ({:.2}, {:.2})", body_x, body_y);
-                                                            // println!("---");
                                                         } else {
                                                             eprintln!("Measured star body vector failed projection (should be impossible?)");
                                                         }
@@ -424,10 +469,8 @@ impl Startracker {
                                                 n_pyramids -= 1;
                                                 break 'inner;
                                             }
-                                            
-
                                         }
-                                        Err(startracker_err) => {
+                                        Err(_startracker_err) => {
                                             // eprintln!("{}",startracker_err)
                                         }
                                     }  
@@ -437,7 +480,7 @@ impl Startracker {
                             }
                             
                         }
-                        Err(startracker_err) => {
+                        Err(_startracker_err) => {
                             // eprintln!("{}",startracker_err)
                         }
                     }
@@ -446,6 +489,5 @@ impl Startracker {
             }
         }
         Err(StartrackerError::NoSolution)
-        
     }
 }
