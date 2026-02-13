@@ -3,6 +3,13 @@ name = "wayfarer"
 version = "0.1.0"
 edition = "2024"
 
+[dev-dependencies]
+divan = "0.1"
+
+[[bench]]
+name = "tracker_bench"
+harness = false
+
 [dependencies]
 usno_gnc_catalog = { git = "https://git.nuntius.us/atmo/angel.git"} 
 #usno_gnc_catalog = { path = "../angel"}
