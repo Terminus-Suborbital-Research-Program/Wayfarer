@@ -1,43 +1,16 @@
 use divan::{Bencher, black_box};
-// use crate::logger::{
-//     ObjectWriter,
-//     ObjectReader
-// };
 
-// use crate::startrack::stardat::{
-//     // CamConfig,
-//     Star,
-//     StarPair,
-// };
+use wayfarer::{
+    perception::{
+    camera_model::CameraModel,
+    centroiding::Starfinder,
+    },
+    startrack::solver::Startracker,
+};
+use image::GrayImage;
 
-
-    use wayfarer::perception::{
-        camera_model::CameraModel,
-        centroiding::{
-            Starfinder,
-            Centroid,
-        }
-    };
-
-    use wayfarer::startrack::{
-        solver::Startracker,
-        quest::quest,
-    };
-    use std::io;
-    use std::fs::{self, DirEntry};
-    use std::path::Path;
-    use aether::math::{Matrix, Vector};
-    use image::{GrayImage, ImageReader, Luma, RgbImage};
-    use image::DynamicImage;
-    use std::time::Instant;
-
-    use bincode::{
-        config::standard,
-        serde::{decode_from_std_read, encode_into_std_write},
-    };
-
-    use rand::Rng;
-    use rand::RngExt;
+use rand::RngExt;
+use std::fs;
 
 
 fn main() {
