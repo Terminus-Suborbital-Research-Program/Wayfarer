@@ -124,13 +124,13 @@ mod tests {
 
                     if let Some((cat_x, cat_y)) = camera_model.project_vector(star) {
                         if let Some((body_x, body_y)) = camera_model.project_vector(*body) {
-                        // println!("Check Coords");
-                        // println!("------------");
-                        // println!("Cat:  X: {:.5} Y: {:.5}", cat_x, cat_y);
-                        // println!("Body: X: {:.5} Y: {:.5}", body_x, body_y);
-                        println!("({:.8}, {:.8}),", cat_x, cat_y);
-                        println!("({:.8}, {:.8}),", body_x, body_y);
-                        // println!("------------");             
+                        println!("Check Coords");
+                        println!("------------");
+                        println!("Cat:  X: {:.5} Y: {:.5}", cat_x, cat_y);
+                        println!("Body: X: {:.5} Y: {:.5}", body_x, body_y);
+                        // println!("({:.8}, {:.8}),", cat_x, cat_y);
+                        // println!("({:.8}, {:.8}),", body_x, body_y);
+                        println!("------------");             
                         } else {
                             eprintln!("Measured star body vector failed projection (should be impossible?)");
                         }
@@ -163,6 +163,9 @@ mod tests {
         let mut gray_image = GrayImage::from(img);
         let mut centroids = starfinder.star_find(&mut gray_image);
         camera_model.undistort_centroids(&mut centroids);
-        startracker.exhaustive_solve(centroids, 10, camera_model);
+        // startracker.exhaustive_solve(centroids, 10, camera_model);
+
+        startracker.exhaustive_solve(centroids, 100, camera_model.clone()).unwrap();
+       
     }
 }
