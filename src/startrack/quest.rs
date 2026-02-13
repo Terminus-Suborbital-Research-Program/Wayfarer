@@ -4,7 +4,7 @@ use aether::attitude::Quaternion;
 use aether::reference_frame::ReferenceFrame;
 use aether::reference_frame::Body;
 use aether::reference_frame::ICRF;
-
+use aether::real::Real;
 
 
 pub fn quest(reference_vectors: &Vec<Vector<f64,3>>, body_vectors: &Vec<Vector<f64,3>>) -> Quaternion<f64, ICRF<f64>,Body<f64>> {
@@ -73,30 +73,30 @@ pub fn quest(reference_vectors: &Vec<Vector<f64,3>>, body_vectors: &Vec<Vector<f
         let q = Quaternion::new(w, p.data[0], p.data[1], p.data[2]).normalized();
         
         // let q: Vector<f64,4> = Vector::new([-p.data[0], -p.data[1], -p.data[2], w]) * norm;
-        println!("Q: {:?}", q);
-        println!("");
-        println!("Check Angle");
-        let mut total_error = 0.0;
-        for (r, b) in reference_vectors.iter().zip(body_vectors.iter()) {
+        // println!("Q: {:?}", q);
+        // println!("");
+        // println!("Check Angle");
+        // let mut total_error = 0.0;
+        // for (r, b) in reference_vectors.iter().zip(body_vectors.iter()) {
             
-            let b_predicted = q.rotate_vector(*r);
+        //     let b_predicted = q.rotate_vector(*r);
             
             
-            let dot = b.dot(&b_predicted).min(1.0).max(-1.0); // Clamp for safety
-            let angle_rad = dot.acos();
-            let angle_deg = angle_rad.to_degrees();
+        //     let dot = b.dot(&b_predicted).min(1.0).max(-1.0); // Clamp for safety
+        //     let angle_rad = dot.acos();
+        //     let angle_deg = angle_rad.to_degrees();
             
-            println!("Star Error: {:.5} degrees", angle_deg);
-            total_error += angle_deg;
-        }
-        println!("Average Error: {:.5} degrees", total_error / reference_vectors.len() as f64);
-        println!("");
+        //     println!("Star Error: {:.5} degrees", angle_deg);
+        //     total_error += angle_deg;
+        // }
+        // println!("Average Error: {:.5} degrees", total_error / reference_vectors.len() as f64);
+        // println!("");
 
 
         return q;
 }
 
-pub fn quest_f32 (reference_vectors: &Vec<Vector<f64,3>>, body_vectors: &Vec<Vector<f64,3>>) -> Quaternion<f32, ICRF<f32>,Body<f32>> {
+pub fn quest_real<R: Real>(reference_vectors: &Vec<Vector<f64,3>>, body_vectors: &Vec<Vector<f64,3>>) -> Quaternion<R, ICRF<R>,Body<R>> {
     // Need to confirm that reference vectors and body vectors are the same length
         // and definitely returned properly from pyramid solve
         // This should be fine but it would be better to be compiler enforced,
@@ -156,7 +156,7 @@ pub fn quest_f32 (reference_vectors: &Vec<Vector<f64,3>>, body_vectors: &Vec<Vec
 
         let w = X.determinant();
 
-        let q = Quaternion::new(w as f32, -p.data[0] as f32 , -p.data[1] as f32 , -p.data[2] as f32 ).normalized();
+        let q = Quaternion::new(R::from_f64(w), R::from_f64(p.data[0]), R::from_f64(p.data[1]), R::from_f64(p.data[2])).normalized();
         
         return q;
 }
