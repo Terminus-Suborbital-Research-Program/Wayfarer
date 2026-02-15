@@ -1,4 +1,4 @@
-use image::{GrayImage, ImageReader, Luma, RgbImage, Rgb};
+use image::{GrayImage, ImageReader, Luma, RgbImage, Rgb, ImageBuffer};
 use image::DynamicImage;
 use aether::math::Vector;
 use std::cmp::Reverse;
@@ -41,6 +41,11 @@ impl Default for Starfinder {
     }
 }
 
+pub type GrayRef<'a> = ImageBuffer<Luma<u8>, &'a mut [u8]>;
+
+use std::ops::{
+    Deref, DerefMut
+};
 impl Starfinder {
     pub fn new(threshold: u8, bg_threshold: u8) -> Self {
         Self {
@@ -49,7 +54,10 @@ impl Starfinder {
         }
     }
 
-    pub fn star_find(&self, gray_image: &mut GrayImage) -> Vec<Centroid> {
+    pub fn star_find<C>(&self, gray_image: &mut ImageBuffer<Luma<u8>, C>) -> Vec<Centroid> 
+    where
+        C: DerefMut<Target = [u8]> 
+    {
         let mut centroids: Vec<Centroid> = Vec::new();
         let (width, height) = gray_image.dimensions();
 
@@ -73,7 +81,10 @@ impl Starfinder {
 
     }
 
-    fn is_dead_pixel(&self, image: &GrayImage, x: u32, y: u32, brightness: u8,) -> bool {
+    fn is_dead_pixel<C>(&self, image: &ImageBuffer<Luma<u8>, C>, x: u32, y: u32, brightness: u8,) -> bool
+    where
+        C: Deref<Target = [u8]> 
+    {
         let bleed_threshold = brightness / 2;
         for x_shift in -1..=1 {
             for y_shift in -1..=1 {
@@ -101,7 +112,10 @@ impl Starfinder {
     //
     // For now stack based solution. - Will benchmark with Pi 5's speed, may need to be migrated to either recursive
     // or row by row, but for now this is sensible and less complicated to prototype
-    fn centroid(&self, image: &mut GrayImage, x: u32, y: u32) -> Centroid {
+    fn centroid<C>(&self, image: &mut ImageBuffer<Luma<u8>, C>, x: u32, y: u32) -> Centroid 
+    where
+        C: DerefMut<Target = [u8]> 
+    {
         let (width, height) = image.dimensions();
 
         let mut pixel_stack = vec![(x,y)];
@@ -148,7 +162,10 @@ impl Starfinder {
     }
 
 
-    pub fn image_report(&self, gray_image: &mut GrayImage) {
+    pub fn image_report<C>(&self, gray_image: &mut ImageBuffer<Luma<u8>, C>)
+    where
+        C: DerefMut<Target = [u8]> 
+    {
         let mut centroids: Vec<Centroid> = Vec::new();
         let (width, height) = gray_image.dimensions();
 
