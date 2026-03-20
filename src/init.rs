@@ -9,13 +9,14 @@ use crate::logger::{
     ObjectWriter,
     ObjectReader
 };
-use usno_gnc_catalog::{GncCatalogReader, IcrsPropagator};
+
+use aether::{GncCatalogReader, IcrsPropagator};
 use aether::math::Vector;
 use crate::perception::camera_model::CameraModel;
 // Create the star table (Set of stars within a certain brightness)
 // Create the star pair vector (set of all stars)
 pub fn init_data() {
-    let gnc = GncCatalogReader::from_csv("../angel/catalog/gnc_v1_1_mar_2_2023.csv").unwrap();
+    let gnc = GncCatalogReader::from_csv("./data/gnc_v1_1_mar_2_2023.csv").unwrap();
     let mut star_cat_saver = ObjectWriter::new("stars.dat");
     let mut star_pair_saver= ObjectWriter::new("star_pairs.dat");
 

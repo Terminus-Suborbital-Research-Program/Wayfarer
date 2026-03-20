@@ -11,9 +11,10 @@ checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 [[package]]
 name = "aether"
 version = "0.1.1"
-source = "git+https://github.com/AtmoPierce/aether.git#25972be9740c902bf24eab814896b07e729e6eb6"
+source = "git+https://github.com/AtmoPierce/aether.git#833cee513fe441d037fa09a26fe343bc993b6862"
 dependencies = [
  "aether_benchmark",
+ "aether_catalogs",
  "aether_core",
  "aether_examples",
  "aether_fluids",
@@ -29,25 +30,39 @@ dependencies = [
 [[package]]
 name = "aether_benchmark"
 version = "0.1.1"
-source = "git+https://github.com/AtmoPierce/aether.git#25972be9740c902bf24eab814896b07e729e6eb6"
+source = "git+https://github.com/AtmoPierce/aether.git#833cee513fe441d037fa09a26fe343bc993b6862"
 dependencies = [
  "minstant",
  "once_cell",
 ]
 
 [[package]]
+name = "aether_catalogs"
+version = "0.1.0"
+source = "git+https://github.com/AtmoPierce/aether.git#833cee513fe441d037fa09a26fe343bc993b6862"
+dependencies = [
+ "aether_core",
+ "csv",
+ "rand 0.9.2",
+ "rkyv",
+ "serde",
+ "sha2",
+]
+
+[[package]]
 name = "aether_core"
 version = "0.1.1"
-source = "git+https://github.com/AtmoPierce/aether.git#25972be9740c902bf24eab814896b07e729e6eb6"
+source = "git+https://github.com/AtmoPierce/aether.git#833cee513fe441d037fa09a26fe343bc993b6862"
 dependencies = [
- "num-traits",
+ "libm",
  "serde",
+ "serde-json-core",
 ]
 
 [[package]]
 name = "aether_examples"
 version = "0.1.1"
-source = "git+https://github.com/AtmoPierce/aether.git#25972be9740c902bf24eab814896b07e729e6eb6"
+source = "git+https://github.com/AtmoPierce/aether.git#833cee513fe441d037fa09a26fe343bc993b6862"
 dependencies = [
  "aether_core",
 ]
@@ -55,12 +70,15 @@ dependencies = [
 [[package]]
 name = "aether_fluids"
 version = "0.1.1"
-source = "git+https://github.com/AtmoPierce/aether.git#25972be9740c902bf24eab814896b07e729e6eb6"
+source = "git+https://github.com/AtmoPierce/aether.git#833cee513fe441d037fa09a26fe343bc993b6862"
+dependencies = [
+ "aether_shapes",
+]
 
 [[package]]
 name = "aether_graphics"
 version = "0.1.1"
-source = "git+https://github.com/AtmoPierce/aether.git#25972be9740c902bf24eab814896b07e729e6eb6"
+source = "git+https://github.com/AtmoPierce/aether.git#833cee513fe441d037fa09a26fe343bc993b6862"
 dependencies = [
  "aether_core",
  "num-traits",
@@ -69,7 +87,7 @@ dependencies = [
 [[package]]
 name = "aether_ml"
 version = "0.1.1"
-source = "git+https://github.com/AtmoPierce/aether.git#25972be9740c902bf24eab814896b07e729e6eb6"
+source = "git+https://github.com/AtmoPierce/aether.git#833cee513fe441d037fa09a26fe343bc993b6862"
 dependencies = [
  "aether_core",
  "aether_opt",
@@ -83,7 +101,7 @@ dependencies = [
 [[package]]
 name = "aether_models"
 version = "0.1.1"
-source = "git+https://github.com/AtmoPierce/aether.git#25972be9740c902bf24eab814896b07e729e6eb6"
+source = "git+https://github.com/AtmoPierce/aether.git#833cee513fe441d037fa09a26fe343bc993b6862"
 dependencies = [
  "aether_core",
 ]
@@ -91,7 +109,7 @@ dependencies = [
 [[package]]
 name = "aether_opt"
 version = "0.1.1"
-source = "git+https://github.com/AtmoPierce/aether.git#25972be9740c902bf24eab814896b07e729e6eb6"
+source = "git+https://github.com/AtmoPierce/aether.git#833cee513fe441d037fa09a26fe343bc993b6862"
 dependencies = [
  "aether_core",
  "aether_rand",
@@ -101,12 +119,15 @@ dependencies = [
 [[package]]
 name = "aether_rand"
 version = "0.1.1"
-source = "git+https://github.com/AtmoPierce/aether.git#25972be9740c902bf24eab814896b07e729e6eb6"
+source = "git+https://github.com/AtmoPierce/aether.git#833cee513fe441d037fa09a26fe343bc993b6862"
+dependencies = [
+ "aether_core",
+]
 
 [[package]]
 name = "aether_shapes"
 version = "0.1.1"
-source = "git+https://github.com/AtmoPierce/aether.git#25972be9740c902bf24eab814896b07e729e6eb6"
+source = "git+https://github.com/AtmoPierce/aether.git#833cee513fe441d037fa09a26fe343bc993b6862"
 dependencies = [
  "aether_core",
  "num-traits",
@@ -115,7 +136,7 @@ dependencies = [
 [[package]]
 name = "aether_stats"
 version = "0.1.1"
-source = "git+https://github.com/AtmoPierce/aether.git#25972be9740c902bf24eab814896b07e729e6eb6"
+source = "git+https://github.com/AtmoPierce/aether.git#833cee513fe441d037fa09a26fe343bc993b6862"
 dependencies = [
  "aether_core",
  "aether_opt",
@@ -314,6 +335,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "block-buffer"
+version = "0.10.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3078c7629b62d3f0439517fa394996acacc5cbc91c5a20d8c658e77abd503a71"
+dependencies = [
+ "generic-array",
+]
+
+[[package]]
 name = "built"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -368,9 +398,9 @@ checksum = "8f1fe948ff07f4bd06c30984e69f5b4899c516a3ef74f34df92a2df2ab535495"
 
 [[package]]
 name = "bytes"
-version = "1.11.0"
+version = "1.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b35204fbdc0b3f4446b89fc1ac2cf84a8a68971995d0bf2e925ec7cd960f9cb3"
+checksum = "1e748733b7cbc798e1434b6ac524f0c1ff2ab456fe201501e6497c8417a4fc33"
 
 [[package]]
 name = "cc"
@@ -406,7 +436,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6f8d983286843e49675a4b7a2d174efe136dc93a18d69130dd18198a6c167601"
 dependencies = [
  "cfg-if",
- "cpufeatures",
+ "cpufeatures 0.3.0",
  "rand_core 0.10.0",
 ]
 
@@ -480,6 +510,15 @@ dependencies = [
 
 [[package]]
 name = "cpufeatures"
+version = "0.2.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "59ed5838eebb26a2bb2e58f6d5b5316989ae9d08bab10e0e6d103e656d1b0280"
+dependencies = [
+ "libc",
+]
+
+[[package]]
+name = "cpufeatures"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b2a41393f66f16b0823bb79094d54ac5fbd34ab292ddafb9a0456ac9f87d201"
@@ -528,6 +567,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "460fbee9c2c2f33933d720630a6a0bac33ba7053db5344fac858d4b8952d77d5"
 
 [[package]]
+name = "crypto-common"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "78c8292055d1c1df0cce5d180393dc8cce0abec0a7102adb6c7b1eef6016d60a"
+dependencies = [
+ "generic-array",
+ "typenum",
+]
+
+[[package]]
 name = "csv"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -556,6 +605,16 @@ checksum = "6d2301688392eb071b0bf1a37be05c469d3cc4dbbd95df672fe28ab021e6a096"
 dependencies = [
  "quote",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "digest"
+version = "0.10.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9ed9a281f7bc9b7576e61468ba615a66a5c8cfdff42420a70aa82701a3b1e292"
+dependencies = [
+ "block-buffer",
+ "crypto-common",
 ]
 
 [[package]]
@@ -698,6 +757,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d9c4f5dac5e15c24eb999c26181a6ca40b39fe946cbe4c263c7209467bc83af2"
 
 [[package]]
+name = "generic-array"
+version = "0.14.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "85649ca51fd72272d7821adaf274ad91c288277713d9c18820d8499a7ff69e9a"
+dependencies = [
+ "typenum",
+ "version_check",
+]
+
+[[package]]
 name = "getrandom"
 version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -773,6 +842,17 @@ name = "hashbrown"
 version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "841d1cc9bed7f9236f321df977030373f4a4163ae1a7dbfe1a51a2c1a51d9100"
+
+[[package]]
+name = "heapless"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0bfb9eb618601c89945a70e254898da93b13be0388091d42117462b265bb3fad"
+dependencies = [
+ "hash32",
+ "serde",
+ "stable_deref_trait",
+]
 
 [[package]]
 name = "heapless"
@@ -952,6 +1032,12 @@ dependencies = [
  "cfg-if",
  "windows-link",
 ]
+
+[[package]]
+name = "libm"
+version = "0.2.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b6d2cec3eae94f9f509c767b45932f1ada8350c4bdb85af2fcab4a3c14807981"
 
 [[package]]
 name = "linux-raw-sys"
@@ -1498,13 +1584,13 @@ checksum = "0c6a884d2998352bb4daf0183589aec883f16a6da1f4dde84d8e2e9a5409a1ce"
 
 [[package]]
 name = "rkyv"
-version = "0.8.12"
+version = "0.8.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "35a640b26f007713818e9a9b65d34da1cf58538207b052916a83d80e43f3ffa4"
+checksum = "1a30e631b7f4a03dee9056b8ef6982e8ba371dd5bedb74d3ec86df4499132c70"
 dependencies = [
  "bytecheck",
  "bytes",
- "hashbrown 0.15.5",
+ "hashbrown 0.16.1",
  "indexmap",
  "munge",
  "ptr_meta",
@@ -1517,9 +1603,9 @@ dependencies = [
 
 [[package]]
 name = "rkyv_derive"
-version = "0.8.12"
+version = "0.8.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bd83f5f173ff41e00337d97f6572e416d022ef8a19f371817259ae960324c482"
+checksum = "8100bb34c0a1d0f907143db3149e6b4eea3c33b9ee8b189720168e818303986f"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1587,6 +1673,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde-json-core"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5b81787e655bd59cecadc91f7b6b8651330b2be6c33246039a65e5cd6f4e0828"
+dependencies = [
+ "heapless 0.8.0",
+ "ryu",
+ "serde",
+]
+
+[[package]]
 name = "serde_core"
 version = "1.0.228"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1617,6 +1714,17 @@ dependencies = [
  "serde",
  "serde_core",
  "zmij",
+]
+
+[[package]]
+name = "sha2"
+version = "0.10.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a7507d819769d01a365ab707794a4084392c824f54a7a6a7862f8c3d0892b283"
+dependencies = [
+ "cfg-if",
+ "cpufeatures 0.2.17",
+ "digest",
 ]
 
 [[package]]
@@ -1726,9 +1834,9 @@ dependencies = [
 
 [[package]]
 name = "tinyvec"
-version = "1.10.0"
+version = "1.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bfa5fdc3bce6191a1dbc8c02d5c8bffcf557bafa17c124c5264a458f1b0613fa"
+checksum = "3e61e67053d25a4e82c844e8424039d9745781b3fc4f32b8d55ed50f5f667ef3"
 dependencies = [
  "tinyvec_macros",
 ]
@@ -1738,6 +1846,12 @@ name = "tinyvec_macros"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
+
+[[package]]
+name = "typenum"
+version = "1.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "562d481066bde0658276a35467c4af00bdc6ee726305698a55b86e61d7ad82bb"
 
 [[package]]
 name = "unicode-ident"
@@ -1758,21 +1872,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6d49784317cd0d1ee7ec5c716dd598ec5b4483ea832a2dced265471cc0f690ae"
 
 [[package]]
-name = "usno_gnc_catalog"
-version = "0.1.0"
-source = "git+https://git.nuntius.us/atmo/angel.git#2679b4aca0772ea06b8ac873ed7ec511744ebb59"
-dependencies = [
- "csv",
- "rand 0.9.2",
- "rkyv",
- "serde",
-]
-
-[[package]]
 name = "uuid"
-version = "1.19.0"
+version = "1.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2e054861b4bd027cd373e18e8d8d8e6548085000e41290d95ce0c373a654b4a"
+checksum = "a68d3c8f01c0cfa54a75291d83601161799e4a89a39e0929f4b0354d88757a37"
 dependencies = [
  "js-sys",
  "wasm-bindgen",
@@ -1814,6 +1917,12 @@ name = "vcpkg"
 version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "accd4ea62f7bb7a82fe23066fb0957d48ef677f6eeb8215f372f52e48bb32426"
+
+[[package]]
+name = "version_check"
+version = "0.9.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "virtue"
@@ -1925,14 +2034,13 @@ dependencies = [
  "aether",
  "bincode",
  "divan",
- "heapless",
+ "heapless 0.9.2",
  "image",
  "indexmap",
  "opencv",
  "rand 0.10.0",
  "serde",
  "thiserror",
- "usno_gnc_catalog",
  "v4l",
 ]
 
