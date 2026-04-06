@@ -1,25 +1,34 @@
 use image::{GrayImage, ImageReader, Luma, RgbImage, Rgb, ImageBuffer};
 use image::DynamicImage;
-use aether::math::Vector;
+use aether::math::{Matrix, Vector};
 use std::cmp::Reverse;
 
 #[derive(Debug, Copy, Clone)]
 pub struct Centroid {
+    pub raw_x: f64,
+    pub raw_y: f64,
     pub unit_loc: Vector<f64, 3>,
     pub brightness: u64,
+    // Diagnostics
+    pub is_valid: bool,
+    pub pixel_count: usize,
+    pub aspect_ratio: f64, // 1.0 is perfectly round. > 2.0 is a streak.
 }
 
 impl Centroid {
-    pub fn new(x: f64, y: f64, brightness: u64) -> Self {
+    pub fn new(x: f64, y: f64, brightness: u64, is_valid: bool, pixel_count: usize, aspect_ratio: f64) -> Self {
         Self {
-            // X and Y can be used for image centroiding to verify we identify stars
-            // Z component 1 is so these coordinates can be converted into
-            // a normalized unit vector ; key step for pyramid 
-            unit_loc: Vector::new([x,y, 1.0]),
+            raw_x: x,
+            raw_y: y,
+            unit_loc: Vector::new([x, y, 1.0]), 
             brightness,
+            is_valid,
+            pixel_count,
+            aspect_ratio,
         }
     }
 }
+
 
 
 /// Convert images to star detectable format, find centroids, and allow easy access to vector data used for identification calculations
@@ -54,160 +63,267 @@ impl Starfinder {
         }
     }
 
-    pub fn star_find<C>(&self, gray_image: &mut ImageBuffer<Luma<u8>, C>) -> Vec<Centroid> 
+   pub fn star_find<C>(&self, gray_image: &mut ImageBuffer<Luma<u8>, C>) -> Vec<Centroid> 
     where
         C: DerefMut<Target = [u8]> 
     {
-        let mut centroids: Vec<Centroid> = Vec::new();
+        let mut raw_blobs: Vec<Centroid> = Vec::new();
         let (width, height) = gray_image.dimensions();
+        let mut visited = vec![false; (width * height) as usize];
 
-        // Manually iterate over image so that we don't try to index outside of the array when checking for dead pixels / centroids
-        for y in 1..(height - 1) {
-            for x in 1..(width - 1) {
-                let pixel = gray_image.get_pixel(x, y);
-                let brightness = pixel[0];
-                if brightness > self.threshold {
-                    if self.is_dead_pixel(&gray_image, x, y, brightness) {
-                        continue;
-                    } else {
-                        centroids.push(self.centroid(gray_image, x, y));
+        for y in 2..(height - 2) {
+            for x in 2..(width - 2) {
+                let idx = (y * width + x) as usize;
+                if visited[idx] { continue; }
+
+                let center_val = gray_image.get_pixel(x, y)[0];
+                
+                if center_val > self.threshold {
+                    let mut is_max = true;
+                    
+                    for dy in -2i32..=2 {
+                        for dx in -2i32..=2 {
+                            if dx == 0 && dy == 0 { continue; }
+                            let nx = (x as i32 + dx) as u32;
+                            let ny = (y as i32 + dy) as u32;
+                            if gray_image.get_pixel(nx, ny)[0] > center_val {
+                                is_max = false;
+                                break;
+                            }
+                        }
+                        if !is_max { break; }
+                    }
+
+                    if is_max {
+                        // Pass x and y as the peak coordinate reference for the Gaussian Fit
+                        if let Some(blob) = self.extract_blob(gray_image, &mut visited, x, y) {
+                            raw_blobs.push(blob);
+                        }
                     }
                 }
             }
         }
-        centroids.sort_by_key(|centroid| Reverse(centroid.brightness));
-        // centroids.sort_by_key(|centroid| centroid.brightness);
-        centroids
+        
+        // Dyanmic exclusion zone - get rid of the moon or earth by killing the validity of
+        // all centroids in a large radius around them. Done because just killing them
+        // directly caused halo effects
+        let massive_bodies: Vec<(f64, f64, f64)> = raw_blobs.iter()
+            .filter(|b| b.pixel_count > 200) 
+            .map(|b| {
+                let base_radius = (b.pixel_count as f64 / std::f64::consts::PI).sqrt();
+                let exclusion_radius = base_radius * 3.5; 
+                (b.raw_x, b.raw_y, exclusion_radius)
+            })
+            .collect();
 
-    }
-
-    fn is_dead_pixel<C>(&self, image: &ImageBuffer<Luma<u8>, C>, x: u32, y: u32, brightness: u8,) -> bool
-    where
-        C: Deref<Target = [u8]> 
-    {
-        let bleed_threshold = brightness / 2;
-        for x_shift in -1..=1 {
-            for y_shift in -1..=1 {
-                // Skip center pixel
-                if x_shift == 0 && y_shift == 0 {
-                    continue; 
-                }
-                // Get each pixel around the center one
-                let pix =  image.get_pixel((x as i32 + x_shift) as u32, (y as i32 + y_shift) as u32)[0];
-
-                // If even one surrounding pixel is bright enough, we can assume this is a star
-                if pix > bleed_threshold {
-                    return false
+        let mut final_centroids: Vec<Centroid> = Vec::new();
+        
+        for mut blob in raw_blobs {
+            let mut masked = false;
+            
+            for &(mx, my, excl_radius) in &massive_bodies {
+                let dx = blob.raw_x - mx;
+                let dy = blob.raw_y - my;
+                let dist = (dx * dx + dy * dy).sqrt();
+                
+                if dist < excl_radius && blob.pixel_count <= 200 { 
+                    masked = true;
+                    break;
                 }
             }
+
+            if masked {
+                blob.is_valid = false;
+            }
+
+            final_centroids.push(blob);
         }
-        
-        // No valid surrounding star bleed detected ; must not be a star
-        return true;
+
+        final_centroids.sort_by_key(|c| std::cmp::Reverse(c.brightness));
+        final_centroids
     }
 
-    // Image Testing shows that this creates many centroids around ultra bright objects such as the moon, therefore
-    // may need to be refactored later if that creates a bottleneck, but the smart triangles scanning method
-    // will also likely make scanning robust against this issue.
-    //
-    // For now stack based solution. - Will benchmark with Pi 5's speed, may need to be migrated to either recursive
-    // or row by row, but for now this is sensible and less complicated to prototype
-    fn centroid<C>(&self, image: &mut ImageBuffer<Luma<u8>, C>, x: u32, y: u32) -> Centroid 
+    fn extract_blob<C>(
+        &self, 
+        image: &mut ImageBuffer<Luma<u8>, C>, 
+        visited: &mut [bool], 
+        start_x: u32, 
+        start_y: u32
+    ) -> Option<Centroid> 
     where
         C: DerefMut<Target = [u8]> 
     {
         let (width, height) = image.dimensions();
-
-        let mut pixel_stack = vec![(x,y)];
-        // Variables used to calculate the x and y coordinate of the centroid based on relative
-        // brightness of each pixel contributing to the star
-        let mut weighted_x_sum: u64 = 0;
-        let mut weighted_y_sum: u64 = 0;
-        let mut sum_of_brightness: u64 = 0;
-
-        while let Some((current_x, current_y)) = pixel_stack.pop() {
-            if current_x == 0 
-            || current_x >= width 
-            || current_y == 0 
-            || current_y >= height 
-            { continue; }
-            let current_brightness = image.get_pixel(current_x, current_y)[0];
-            if current_brightness > self.threshold {
-                weighted_x_sum += current_x as u64 * current_brightness as u64;
-                weighted_y_sum += current_y as u64 * current_brightness as u64;
-                sum_of_brightness += current_brightness as u64;
-
-                // Blot out current pixel so that this blob is not rescanned later
-                image.put_pixel(current_x, current_y, Luma([0]));
-
-                // Examine other pixels to be added
-                pixel_stack.push((current_x + 1, current_y));
-                pixel_stack.push((current_x, current_y + 1));
-                pixel_stack.push((current_x - 1, current_y));
-                pixel_stack.push((current_x,current_y - 1));
-
-            } else if current_brightness > self.bg_threshold {
-                weighted_x_sum += current_x as u64 * current_brightness as u64;
-                weighted_y_sum += current_y as u64 * current_brightness as u64;
-                sum_of_brightness += current_brightness as u64;
-                
-                image.put_pixel(current_x, current_y, Luma([0]));
-            }
-        }
-
-        let centroid_x: f64 = weighted_x_sum as f64 / sum_of_brightness as f64;
-        let centroid_y: f64 = weighted_y_sum as f64 / sum_of_brightness as f64;
-
-        Centroid::new(centroid_x, centroid_y, sum_of_brightness)
-    }
-
-
-    pub fn image_report<C>(&self, gray_image: &mut ImageBuffer<Luma<u8>, C>)
-    where
-        C: DerefMut<Target = [u8]> 
-    {
-        let mut centroids: Vec<Centroid> = Vec::new();
-        let (width, height) = gray_image.dimensions();
-
-    
-        let mut vec: Vec<u8> = Vec::new();
-        for y in 1..(height - 1) {
-            for x in 1..(width - 1) {
-
-                let pixel = gray_image.get_pixel(x, y);
-                let brightness = pixel[0];
-                if brightness > self.threshold {
-                    if self.is_dead_pixel(&gray_image, x, y, brightness) {
-                        continue;
-                    } else {
-                        centroids.push(self.centroid(gray_image, x, y));
+        let peak_val = image.get_pixel(start_x, start_y)[0];
+        
+        // Calculate Local Background
+        let mut ring_pixels = Vec::with_capacity(50);
+        for dy in -6i32..=6 {
+            for dx in -6i32..=6 {
+                if dx.abs() == 6 || dy.abs() == 6 {
+                    let px = start_x as i32 + dx;
+                    let py = start_y as i32 + dy;
+                    if px >= 0 && px < width as i32 && py >= 0 && py < height as i32 {
+                        ring_pixels.push(image.get_pixel(px as u32, py as u32)[0]);
                     }
                 }
-                // println!("Brightness: {}",brightness);
-                vec.push(brightness);
+            }
+        }
+        ring_pixels.sort_unstable();
+        let local_bg = if ring_pixels.is_empty() { 0 } else { ring_pixels[ring_pixels.len() / 2] };
+        
+        if peak_val < local_bg.saturating_add(12) {
+            visited[(start_y * width + start_x) as usize] = true;
+            return None; 
+        }
 
+        let fill_threshold = self.threshold.max(local_bg.saturating_add(3));
+        let mut pixel_stack = vec![(start_x, start_y)];
+        let mut pixels = Vec::with_capacity(64);
+
+        // Flood fill with visited mask
+        while let Some((cx, cy)) = pixel_stack.pop() {
+            if cx == 0 || cx >= width - 1 || cy == 0 || cy >= height - 1 { continue; }
+
+            let idx = (cy * width + cx) as usize;
+            if visited[idx] { continue; } 
+
+            let val = image.get_pixel(cx, cy)[0];
+            
+            if val > fill_threshold {
+                visited[idx] = true; 
+                pixels.push((cx, cy, val));
+
+                pixel_stack.push((cx + 1, cy));
+                pixel_stack.push((cx - 1, cy));
+                pixel_stack.push((cx, cy + 1));
+                pixel_stack.push((cx, cy - 1));
             }
         }
 
-        centroids.sort_by_key(|centroid| centroid.brightness);
-        println!("Num centroids: {}", centroids.len());
-        for centroid in centroids {
-            println!("({},{}),",centroid.unit_loc[0], centroid.unit_loc[1])
+        let pixel_count = pixels.len();
+        if pixel_count == 0 { return None; }
+
+        // Center of mass and covariance
+        let mut sum_intensity = 0.0;
+        let mut w_x = 0.0;
+        let mut w_y = 0.0;
+
+        // also need to format the pixels for the Gaussian Fitter: (dx, dy, net_intensity)
+        let mut fit_pixels = Vec::with_capacity(pixel_count);
+
+        for &(px, py, val) in &pixels {
+            let intensity = val.saturating_sub(local_bg).max(1) as f64; 
+            
+            w_x += (px as f64) * intensity;
+            w_y += (py as f64) * intensity;
+            sum_intensity += intensity;
+
+            // Offset relative to the initial peak
+            let dx = (px as i32 - start_x as i32) as f64;
+            let dy = (py as i32 - start_y as i32) as f64;
+            fit_pixels.push((dx, dy, intensity));
         }
 
-        vec.sort();
-        let mut new: Vec<u8> = vec.into_iter().filter(|brightness| *brightness > 20u8).collect();
+        // Center of Mass Fallback
+        let mut final_x = w_x / sum_intensity;
+        let mut final_y = w_y / sum_intensity;
+
+        // SUB-PIXEL GAUSSIAN FIT
+        // Overwrite the CoM coordinates if the Gaussian solver converges
+        if let Some((dx_fit, dy_fit)) = self.fast_gaussian_fit(&fit_pixels) {
+            final_x = start_x as f64 + dx_fit;
+            final_y = start_y as f64 + dy_fit;
+        }
+
+        // Covariance
+        let mut var_x = 0.0;
+        let mut var_y = 0.0;
+        let mut cov_xy = 0.0;
+
+        for &(px, py, val) in &pixels {
+            let intensity = val.saturating_sub(local_bg).max(1) as f64;
+            // Use CoM for covariance shape testing, not the fitted peak
+            let dx = (px as f64) - (w_x / sum_intensity);
+            let dy = (py as f64) - (w_y / sum_intensity);
+            var_x += dx * dx * intensity;
+            var_y += dy * dy * intensity;
+            cov_xy += dx * dy * intensity;
+        }
+
+        var_x /= sum_intensity;
+        var_y /= sum_intensity;
+        cov_xy /= sum_intensity;
+
+        let trace = var_x + var_y;
+        let det = var_x * var_y - cov_xy * cov_xy;
+        let discriminant = (trace * trace - 4.0 * det).max(0.0).sqrt();
+        let l1 = (trace + discriminant) / 2.0; 
+        let l2 = (trace - discriminant).max(1e-6) / 2.0; 
+
+        let aspect_ratio = (l1 / l2).sqrt();
+
+        // THE GATES
+        let valid_shape = if pixel_count > 6 { aspect_ratio < 2.5 } else { true };
+        let is_valid = pixel_count >= 2 && pixel_count <= 150 && valid_shape;
+
+        let total_brightness: u64 = pixels.iter().map(|&(_, _, v)| v as u64).sum();
+
+        Some(Centroid::new(final_x, final_y, total_brightness, is_valid, pixel_count, aspect_ratio))
+    }
+   
+
+    /// Executes Fast Gaussian Fitting on a local window of pixels.
+    /// Returns the sub-pixel (dx, dy) offset relative to the peak_x, peak_y.
+    fn fast_gaussian_fit(&self, pixels: &[(f64, f64, f64)]) -> Option<(f64, f64)> {
+        if pixels.len() < 5 {
+            return None; // Not enough data points to fit a 4-parameter model
+        }
+
+        let mut wtw = Matrix::<f64, 4, 4>::zeros();
+        let mut wtz = Vector::<f64, 4>::default();
+
+        // Build the normal equations: (W^T * W) * a = W^T * Z
+        for &(dx, dy, intensity) in pixels {
+            // Protect against log(0) or negative numbers after background subtraction
+            if intensity <= 0.0 { continue; } 
+            
+            let z = intensity.ln();
+            let h = dx * dx + dy * dy;
+            let w_row = [h, dx, dy, 1.0];
+
+            for i in 0..4 {
+                wtz[i] += w_row[i] * z;
+                for j in 0..4 {
+                    wtw[(i, j)] += w_row[i] * w_row[j];
+                }
+            }
+        }
+
+        // Solve for coefficients 'a' using Gauss-Jordan inversion
+        if let Some(wtw_inv) = wtw.inverse_gauss_jordan() {
+            let a = wtw_inv * wtz;
+            
+            let a0 = a[0];
+            let a1 = a[1];
+            let a2 = a[2];
+
+            // If a0 is positive, the parabola is facing upwards (not a star bell curve)
+            if a0 >= 0.0 { return None; }
+
+            let xc_offset = -a1 / (2.0 * a0);
+            let yc_offset = -a2 / (2.0 * a0);
+
+            // Sanity check: the sub-pixel offset shouldn't be wildly outside the window
+            if xc_offset.abs() > 4.0 || yc_offset.abs() > 4.0 {
+                return None;
+            }
+
+            return Some((xc_offset, yc_offset));
+        }
         
-        new.sort();
-        println!("LEN: {} ",new.len());
-
-        println!("Lowest Brightness: {}, Highest: {}",new[0], new.last().unwrap());
-        let sum = new.iter().map(|&b| b as u32).sum::<u32>();
-        // let average = sum / new.len() as u32;
-        let mid_index = (new.len() - 1) / 2;
-        let average = sum / new.len() as u32;
-
-        println!("Average: {}, Median {}",average, new[mid_index]);
+        None // Matrix was singular (perfectly flat or degenerate data)
     }
 
+    
 }
