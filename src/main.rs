@@ -36,16 +36,35 @@ use perception::{
 
 
 fn main() -> io::Result<()>{
-    // init_data();
-    // init_k_vector();
+    
     // let camera_view_centroids: Vec<Centroid> = centroids.iter().cloned().collect();
     
-    let path = "/home/supergoodname77/Desktop/Elara/startracking/images/set1/bright-VISNIR-310ms_24d1g_50ict_0bl_0d80gam_set1_1.tiff";
+    // let path = "/home/supergoodname77/Desktop/Elara/startracking/images/set1/bright-VISNIR-310ms_24d1g_50ict_0bl_0d80gam_set1_1.tiff";
+    let path = "/home/supergoodname77/Desktop/Elara/startracking/images/jericho_cleaned_tiff/cor0.tiff";
+
+    let tevs_camera = CameraModel::new(
+        73.0,          // fov: Datasheet H-FOV
+        1751.44,       // fx: Calculated from 73.0 deg H-FOV
+        1751.15,       // fy: Calculated from 58.1 deg V-FOV
+        1296.0,        // cx: Image width / 2
+        972.0,         // cy: Image height / 2
+        0.0,           // k1: Baseline
+        0.0,           // k2: Baseline
+        0.0,           // k3: Baseline
+        0.0,           // p1: Baseline
+        0.0            // p2: Baseline
+    );
+    init_data(&tevs_camera);
+    init_k_vector();
+    // init_k_vector();
+
+
     let mut starfinder = Starfinder::default();
-    let camera_model = CameraModel::default();
+
+    // let camera_model = CameraModel::default();
     let startracker = Startracker::default();
 
-    full_solve(path, starfinder, camera_model, startracker);
+    full_solve(path, starfinder, tevs_camera, startracker);
 
     
     
@@ -58,7 +77,7 @@ fn full_solve(path: &str, starfinder: Starfinder, camera_model: CameraModel, sta
     let mut gray_image = GrayImage::from(img);
     let mut centroids = starfinder.star_find(&mut gray_image);
     camera_model.undistort_centroids(&mut centroids);
-    match startracker.pyramid_solve(centroids) {
+    match startracker.adaptive_pyramid_solve(centroids) {
     // match startracker.exhaustive_solve(centroids, 100) {
         Ok((reference_vectors, body_vectors)) => {
             let q = quest(&reference_vectors, &body_vectors);
