@@ -12,5 +12,7 @@ pub enum StartrackerError {
     #[error("Calculated leg falls outside of fov range / valid bounds")]
     NoPairsRange,
     #[error("No solution found in image")]
-    NoSolution
+    NoSolution,
+    #[error("Needs to second looser round")]
+    LoserBounds
 }
