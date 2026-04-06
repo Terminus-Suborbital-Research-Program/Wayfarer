@@ -21,6 +21,8 @@ thiserror = "2.0.17"
 heapless = "0.9.2"
 indexmap = "2.12.1"
 v4l = "0.14.0"
+ndarray = "0.17.2"
+scirs2-optimize = "0.4.1"
 
 [net]
 git-fetch-with-cli = true
