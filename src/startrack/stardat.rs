@@ -77,6 +77,11 @@ impl K_Vector {
         
         let bound_1 = self.k_vector_table[k_index_start];
         let bound_2 = self.k_vector_table[k_index_end + 1];
+
+        if bound_1 >= bound_2 {
+            return Err(StartrackerError::NoPairsRange);
+        }
+        
         Ok((bound_1, bound_2))
     }
 }

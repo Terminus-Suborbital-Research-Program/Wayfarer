@@ -49,6 +49,6 @@ fn tracker_bench(bencher: Bencher) {
             camera_model.undistort_centroids(&mut centroids);
             
             // Wrap in black_box so the compiler doesn't optimize it away
-            black_box(startracker.pyramid_solve(centroids))
+            black_box(startracker.adaptive_pyramid_solve(centroids))
         });
 }

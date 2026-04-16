@@ -15,19 +15,18 @@ use aether::math::Vector;
 use crate::perception::camera_model::CameraModel;
 // Create the star table (Set of stars within a certain brightness)
 // Create the star pair vector (set of all stars)
-pub fn init_data() {
+pub fn init_data(camera_model: &CameraModel) {
     let gnc = GncCatalogReader::from_csv("./data/gnc_v1_1_mar_2_2023.csv").unwrap();
     let mut star_cat_saver = ObjectWriter::new("stars.dat");
     let mut star_pair_saver= ObjectWriter::new("star_pairs.dat");
 
-    let camera_model = CameraModel::default();
     let mut stars: Vec<Star> = Vec::with_capacity(4424);
     // let cam_config = CamConfig::default();
 
     let mut pairs: Vec<StarPair> = Vec::with_capacity(1_024_127);
     let min_cos = camera_model.fov.to_radians().cos();
     let catalog = gnc.records;
-    let epoch = 2025.9;
+    let epoch = 2026.0 + (9.0/12.0);
     let record_count = catalog.len();
 
     let mut valid_stars_count = 0;
@@ -124,7 +123,10 @@ pub fn init_k_vector() {
         current_k += 1;
     }
 
-    let k_vec = K_Vector::new(k_vector, cos_min, cos_max, m, 0.0002);
+    // let k_vec = K_Vector::new(k_vector, cos_min, cos_max, m, 0.00005);
+    let k_vec = K_Vector::new(k_vector, cos_min, cos_max, m, 0.00002);
+
+
 
     let mut k_writer = ObjectWriter::new("k_vector.dat");
     k_writer.write_obj(&k_vec).unwrap();

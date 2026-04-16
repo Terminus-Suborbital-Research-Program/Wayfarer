@@ -69,38 +69,7 @@ impl Startracker {
     pub fn retrieve_unit_vector(&self, star_id: &usize) -> Star {
         self.star_cat[*star_id].clone()
     }
-    // Iterative implementation of checking 
-    // pub fn query_triangle(&self, legs: &[f64;3]) -> Result<[usize;3], StartrackerError> {
-    //     let mut counts: IndexMap<usize, usize> = IndexMap::new();
-    //     let mut triangle: heapless::Vec<usize, 3> = heapless::Vec::new();
-    //     for leg in legs {
-    //         let (bound_1, bound_2) = self.k_vector.get_pairs_range(leg);
 
-    //         if bound_1 == bound_2 {
-    //             return Err(StartrackerError::TriangleQueryFailure(String::from("")));
-    //         }
-
-    //         let pairs = &self.star_pairs[bound_1..bound_2];
-
-    //         for pair in pairs {
-    //             // Count the occurence of each star ID that could be associated with the legs
-    //             // if one has 3 occurences (unique solution), it can be checked against a fourth reference star (pyramid)
-    //             *counts.entry(pair.id_1).or_insert(0) += 1;
-    //             *counts.entry(pair.id_2).or_insert(0) += 1;
-    //         }
-    //     }
-    //     for (star_id, count) in counts.iter() {
-    //         if *count == 2 {
-    //             triangle.push(*star_id).map_err(|_| StartrackerError::TriangleQueryFailure)?;
-    //         }
-    //     }
-    //     match triangle.into_array::<3>() {
-    //         Ok(stars) => Ok(stars),
-    //         Err(_) => Err(StartrackerError::TriangleQueryFailure),
-    //     }
-    // }
-
-    /// 
     
     // This is the "Pyramid" part of the algorthm
     // We have a triangle. This means 3 star ids, and three legs (angular distances)
@@ -183,7 +152,7 @@ impl Startracker {
         let (s1, e1) = self.k_vector.get_pairs_range(&legs[1])?;
         let (s2, e2) = self.k_vector.get_pairs_range(&legs[2])?;
 
-        if s0 == e0 || s1 == e1 || s2 == e2 {
+        if s0 >= e0 || s1 >= e1 || s2 >= e2 {
             return Err(StartrackerError::TriangleQueryFailure(String::from("Leg does not exist in catalog")));
         }
 
@@ -228,8 +197,182 @@ impl Startracker {
     }
 }
 
+
+
+use crate::startrack::quest::quest;
+use aether::attitude::Quaternion;
+use aether::reference_frame::Body;
+use aether::reference_frame::ICRF;
+
+
+
+
 impl Startracker {
-    pub fn pyramid_solve(&self, centroids: Vec<Centroid> ) -> Result<(Vec<Vector<f64,3>>, Vec<Vector<f64,3>>), StartrackerError> {
+
+    /// Project all captured centroids and accept ones that pass the threshold of the tolerance
+    /// cosine or the best of centroid angular distance precision as inliers
+    /// return inlier refs (catalog) and bodies
+    fn score_quaternion(
+        &self, 
+        q: &Quaternion<f64, ICRF<f64>, Body<f64>>, 
+        centroids: &[Centroid],
+        tolerance_cos: f64 
+    ) -> (Vec<Vector<f64, 3>>, Vec<Vector<f64, 3>>) {
+        let mut inlier_refs = Vec::with_capacity(centroids.len());
+        let mut inlier_bodies = Vec::with_capacity(centroids.len());
+        let mut claimed_cat_indices = Vec::with_capacity(centroids.len());
+
+        for centroid in centroids {
+            let v_celestial = q.rotate_vector(centroid.unit_loc);
+            let mut best_dot = tolerance_cos;
+            let mut best_match_idx = None;
+
+            for (idx, cat_star) in self.star_cat.iter().enumerate() {
+                let dot = v_celestial.dot(&cat_star.vector);
+                if dot > best_dot && !claimed_cat_indices.contains(&idx) {
+                    best_dot = dot;
+                    best_match_idx = Some(idx);
+                }
+            }
+
+            if let Some(idx) = best_match_idx {
+                claimed_cat_indices.push(idx);
+                inlier_refs.push(self.star_cat[idx].vector);
+                inlier_bodies.push(centroid.unit_loc);
+            }
+        }
+        (inlier_refs, inlier_bodies)
+    }
+
+
+    /// Hybrid between Pyramid and Progressive Sample Consensus
+    /// Basically, we look for a valid pyramid of 4 stars with an angular distance
+    /// configuration that could befound in the database, like with the regular scheme 
+    /// of the pyramid algorithm.
+    /// However after this, it still could be false, as our camera is not of the 
+    /// quality of typical startrackers, so we generate a quaternion from it,
+    /// then see if that quaternion generates enough 
+    pub fn pyramid_solve(&self, centroids: Vec<Centroid>, max_iters: u32, strict_threshold: f64) -> Result<(Vec<Vector<f64,3>>, Vec<Vector<f64,3>>), StartrackerError> {
+        let n = centroids.len();
+        if n < 4 {
+            return Err(StartrackerError::NoSolution);
+        }
+
+        let mut best_inliers = 0;
+        let mut best_solution: Option<(Vec<Vector<f64,3>>, Vec<Vector<f64,3>>)> = None;
+        let mut counter = 0;
+
+        // Smart loop to start from brightest stars, but swap around indeces
+        // such that we never keep an invalid star for too long
+        for dj in 1..n-1 {
+            for dk in 1..n-dj {
+                for i in 0..(n-dj-dk) {
+                    let j = i + dj;
+                    let k = j + dk;
+                    if i == j || j == k || i == k { continue; }
+
+                    let b1 = centroids[i].unit_loc;
+                    let b2 = centroids[j].unit_loc;
+                    let b3 = centroids[k].unit_loc;
+
+                    let c_theta_1 = b1.dot(&b2);
+                    let c_theta_2 = b1.dot(&b3);
+                    let c_theta_3 = b2.dot(&b3);
+
+                    if let Ok(triangles) = self.query_triangle_topology(&[c_theta_1, c_theta_2, c_theta_3]) {
+                        
+                        counter += 1;
+                        if counter >= max_iters {
+                            return Err(StartrackerError::LoserBounds); 
+                        }
+
+                        for triangle in triangles {
+                            for r in 0..n {
+                                if r == i || r == j || r == k { continue; }
+
+                                let b4 = centroids[r].unit_loc;
+                                let confirmation_leg_1 = b1.dot(&b4);
+                                let confirmation_leg_2 = b2.dot(&b4);
+                                let confirmation_leg_3 = b3.dot(&b4);
+
+                                if let Ok(star_r_index) = self.pyramid_confirmation(
+                                    &[confirmation_leg_1, confirmation_leg_2, confirmation_leg_3], &triangle) 
+                                {
+                                    let mut reference_vectors: Vec<Vector<f64,3>> = triangle
+                                        .iter()
+                                        .map(|id| self.retrieve_unit_vector(id).vector)
+                                        .collect();
+                                    reference_vectors.push(self.retrieve_unit_vector(&star_r_index).vector);
+                                    let body_vectors = vec![b1, b2, b3, b4];
+
+                                    let q_hyp = quest(&reference_vectors, &body_vectors);
+                                    
+                                    // Accept a limited amount of inlier stars, within a loose degree threshold (2.5 degree)
+                                    let (pass1_refs, pass1_bodies) = self.score_quaternion(&q_hyp, &centroids, 0.999);
+                                    let pass1_count = pass1_refs.len();     
+                                    
+                                    // If we capture enough inliers (more than 4)
+                                    if pass1_count >= 4 && pass1_count > best_inliers {
+                                        let q_stable = quest(&pass1_refs, &pass1_bodies);
+
+                                        // Accept inliers that are of a higher degree of precision (driven by variable, but generally trying to capture around 2 pixel error)
+                                        let (pass2_refs, pass2_bodies) = self.score_quaternion(&q_stable, &centroids, strict_threshold);
+                                        let pass2_count = pass2_refs.len();
+
+                                        if pass2_count >= 3 {
+                                            best_inliers = pass1_count; 
+                                            best_solution = Some((pass2_refs, pass2_bodies));
+
+                                            if pass2_count >= 4 || pass1_count >= 5 {
+                                                return Ok(best_solution.unwrap());
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if best_inliers >= 4 {
+            if let Some(solution) = best_solution {
+                return Ok(solution);
+            }
+        }
+
+        Err(StartrackerError::NoSolution)
+    }
+
+
+    /// Method to try solving twice, one pass for a high accurracy solve
+    /// with lower chance of succeeding, and one for a lower accuracy solve
+    /// with a high change of succeeding
+    pub fn adaptive_pyramid_solve(
+        &self, 
+        centroids: Vec<Centroid>
+    ) -> Result<(Vec<Vector<f64, 3>>, Vec<Vector<f64, 3>>), StartrackerError> {
+        
+        // Tight threshold (0.08 deg), low iteration limit (Fast fail)                                               291 arcsec
+        if let Ok(solution) = self.pyramid_solve(centroids.clone(), 500, 0.999999) {
+            return Ok(solution);
+        }
+
+        // Loose threshold (0.25 deg), high iteration limit (Deep search)
+        if let Ok(solution) = self.pyramid_solve(centroids, 100, 0.999998) {
+            return Ok(solution);
+        }
+
+        // If both phases exhaust their limits, the image is truly unsolvable.
+        Err(StartrackerError::NoSolution)
+    }
+
+}
+
+
+impl Startracker {
+    pub fn pyramid_solve_old(&self, centroids: Vec<Centroid> ) -> Result<(Vec<Vector<f64,3>>, Vec<Vector<f64,3>>), StartrackerError> {
 
         // let reference_vectors: Vector<f64,3>
         // Core Lost in space identification loop
@@ -318,176 +461,4 @@ impl Startracker {
 }
 
 
-use crate::startrack::quest::quest;
-use aether::attitude::Quaternion;
-use aether::reference_frame::Body;
-use aether::reference_frame::ICRF;
-struct Pyramid {
-    reference_vectors: [Vector<f64,3>;4],
-    body_vectors: [Vector<f64,3>;4],
-    quaternion: Quaternion<f64,ICRF<f64>,Body<f64>>
-}
 
-
-// A Debug method to get a many solves for stars in the same image - need to fix
-impl Startracker {
-    pub fn exhaustive_solve(&self, centroids: Vec<Centroid>, mut n_pyramids: usize, camera_model: CameraModel) -> Result<(Vec<Vector<f64,3>>, Vec<Vector<f64,3>>), StartrackerError> {
-        let mut reference_vectors: Vec<Vector<f64,3>> = Vec::new();
-        let mut body_vectors: Vec<Vector<f64,3>> = Vec::new();
-
-        // Core Lost in space identification loop
-        let mut j = 0;
-        let mut k = 0;
-
-        let n = centroids.len();
-        for dj in 1..n-1 {
-            for dk in 1..n-dj {
-                'inner: for i in 0..(n-dj-dk) {
-                    j = i + dj;
-                    k = j + dk;
-                    if i == j || j == k || i == k {
-                        continue;
-                    }
-                    // We take the unit vectors relative to the center of the camer, of 3 centroids
-                    let b1 = centroids[i].unit_loc;
-                    let b2 = centroids[j].unit_loc;
-                    let b3 = centroids[k].unit_loc;
-
-                    // We compute their "legs", cosine theta values that can be used to represent the angular distance between
-                    // a pair of stars. Found by the dot product of two unit vectors
-                    let c_theta_1 = b1.dot(&b2);
-                    let c_theta_2 = b1.dot(&b3);
-                    let c_theta_3 = b2.dot(&b3);
-
-                    match &self.query_triangle_topology(&[c_theta_1, c_theta_2, c_theta_3]) {
-                        Ok(triangles) => {
-                            let n_triangles = triangles.len();
-                            
-                            if n_triangles == 1 {
-                                // Unique Solution: We must still find a 4th star to form the pyramid
-                                let triangle = triangles[0];
-                                for r in 0..n {
-                                    if r == i || r == j || r == k {continue;}
-
-                                    let b4: Vector<f64, 3> = centroids[r].unit_loc;
-                                    let confirmation_leg_1 = b1.dot(&b4);
-                                    let confirmation_leg_2 = b2.dot(&b4);
-                                    let confirmation_leg_3 = b3.dot(&b4);
-                                    
-                                    // Verify the 4th star
-                                    match &self.pyramid_confirmation(
-                                        &[confirmation_leg_1, confirmation_leg_2, confirmation_leg_3], &triangle) {
-                                        Ok(star_r_index) => {
-                                            // Success: Populate vectors
-                                            for id in triangle.iter() {
-                                                reference_vectors.push(self.retrieve_unit_vector(&id).vector);
-                                            }
-                                            reference_vectors.push(self.retrieve_unit_vector(&star_r_index).vector);
-
-                                            body_vectors.push(b1);
-                                            body_vectors.push(b2);
-                                            body_vectors.push(b3);
-                                            body_vectors.push(b4);
-                                            
-                                            if n_pyramids == 1 {
-                                                return Ok((reference_vectors, body_vectors));
-                                            } else {
-                                                // Debug/Verification logic for multiple pyramids
-                                                let q = quest(&reference_vectors, &body_vectors);
-
-                                                for (reference, body) in reference_vectors.iter().zip(body_vectors.iter()) {
-                                                    let star = q.rotate_vector(*reference);
-
-                                                    if let Some((cat_x, cat_y)) = camera_model.project_vector(star) {
-                                                        if let Some((body_x, body_y)) = camera_model.project_vector(*body) {
-                                                            println!("({:.5}, {:.5}),", cat_x, cat_y);
-                                                            println!("({:.5}, {:.5}),", body_x, body_y);
-                                                        } else {
-                                                            eprintln!("Measured star body vector failed projection (should be impossible?)");
-                                                        }
-                                                    } else {
-                                                        eprintln!("Solved star is behind camera (Bad Quaternion?)");
-                                                    }
-                                                }
-                                                reference_vectors.clear();
-                                                body_vectors.clear();
-                                                n_pyramids -= 1;
-                                                break 'inner;
-                                            }
-                                        }
-                                        Err(_startracker_err) => {
-                                            // 4th star did not match this triangle, continue searching
-                                        }
-                                    }
-                                }
-
-                            } else if n_triangles > 1 {
-                                // Multiple candidates, try to disambiguate with 4th star
-                                for r in 0..n {
-                                    if r == i || r == j || r == k {continue;}
-
-                                    let b4: Vector<f64, 3> = centroids[r].unit_loc;
-                                    let confirmation_leg_1 = b1.dot(&b4);
-                                    let confirmation_leg_2 = b2.dot(&b4);
-                                    let confirmation_leg_3 = b3.dot(&b4);
-                                    
-                                    for triangle in triangles {
-                                        match &self.pyramid_confirmation(
-                                        &[confirmation_leg_1, confirmation_leg_2, confirmation_leg_3], triangle) {
-                                        Ok(star_r_index) => {
-                                            for id in triangle.iter() {
-                                                reference_vectors.push(self.retrieve_unit_vector(&id).vector);
-                                            }
-                                            reference_vectors.push(self.retrieve_unit_vector(&star_r_index).vector);
-
-                                            body_vectors.push(b1);
-                                            body_vectors.push(b2);
-                                            body_vectors.push(b3);
-                                            body_vectors.push(b4);
-                                            
-                                            if n_pyramids == 1 {
-                                                return Ok((reference_vectors, body_vectors));
-                                            } else {
-                                                let q = quest(&reference_vectors, &body_vectors);
-
-                                                for (reference, body) in reference_vectors.iter().zip(body_vectors.iter()) {
-                                                    let star = q.rotate_vector(*reference);
-
-                                                    if let Some((cat_x, cat_y)) = camera_model.project_vector(star) {
-                                                        if let Some((body_x, body_y)) = camera_model.project_vector(*body) {
-                                                            println!("({:.5}, {:.5}),", cat_x, cat_y);
-                                                            println!("({:.5}, {:.5}),", body_x, body_y);
-                                                        } else {
-                                                            eprintln!("Measured star body vector failed projection (should be impossible?)");
-                                                        }
-                                                    } else {
-                                                        eprintln!("Solved star is behind camera (Bad Quaternion?)");
-                                                    }
-                                                }
-                                                reference_vectors.clear();
-                                                body_vectors.clear();
-                                                n_pyramids -= 1;
-                                                break 'inner;
-                                            }
-                                        }
-                                        Err(_startracker_err) => {
-                                            // eprintln!("{}",startracker_err)
-                                        }
-                                    }  
-                                    }
-                                    
-                                }
-                            }
-                            
-                        }
-                        Err(_startracker_err) => {
-                            // eprintln!("{}",startracker_err)
-                        }
-                    }
-                    
-                }
-            }
-        }
-        Err(StartrackerError::NoSolution)
-    }
-}
