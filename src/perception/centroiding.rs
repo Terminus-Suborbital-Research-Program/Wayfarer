@@ -50,7 +50,7 @@ impl Default for Starfinder {
     }
 }
 
-pub type GrayRef<'a> = ImageBuffer<Luma<u8>, &'a mut [u8]>;
+pub type GrayRef<'a> = ImageBuffer<Luma<u8>, &'a [u8]>;
 
 use std::ops::{
     Deref, DerefMut
@@ -63,9 +63,9 @@ impl Starfinder {
         }
     }
 
-   pub fn star_find<C>(&self, gray_image: &mut ImageBuffer<Luma<u8>, C>) -> Vec<Centroid> 
+   pub fn star_find<C>(&self, gray_image: &ImageBuffer<Luma<u8>, C>) -> Vec<Centroid> 
     where
-        C: DerefMut<Target = [u8]> 
+        C: Deref<Target = [u8]> 
     {
         let mut raw_blobs: Vec<Centroid> = Vec::new();
         let (width, height) = gray_image.dimensions();
@@ -145,13 +145,13 @@ impl Starfinder {
 
     fn extract_blob<C>(
         &self, 
-        image: &mut ImageBuffer<Luma<u8>, C>, 
+        image: &ImageBuffer<Luma<u8>, C>, 
         visited: &mut [bool], 
         start_x: u32, 
         start_y: u32
     ) -> Option<Centroid> 
     where
-        C: DerefMut<Target = [u8]> 
+        C: Deref<Target = [u8]> 
     {
         let (width, height) = image.dimensions();
         let peak_val = image.get_pixel(start_x, start_y)[0];
